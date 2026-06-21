@@ -1,0 +1,171 @@
+# 跨项目协作基线
+
+> 仅在涉及**跨项目**的任务（跨项目需求、契约、状态、coordination 仓读写）时按需读取。单项目任务不读本文件（由 `runtime.md` 路由）。
+> 本文件只处理跨项目边界，不替代任何单项目的 `docs/progress/INDEX.md`、迭代记录或角色日志。
+
+## 目标与适用场景
+
+定义同一产品生态内多个项目仓库如何协作。适用：
+
+- 一个功能需要两个以上项目共同交付。
+- 一个项目暴露给另一个项目的 API / schema / 事件 / 部署依赖发生变化。
+- 新项目需要复用本团队工作流。
+- Owner 创建或指定协调仓，承载跨项目契约和状态。
+
+## 基本模型（三层）
+
+```text
+业务项目 A          ← 各自独立 baseline / progress / knowledge
+业务项目 B          ← 各自独立 baseline / progress / knowledge
+coordination 仓     ← 跨项目契约与状态的单一真源
+```
+
+每个业务项目仍是独立项目，各自维护 `project-context.md`、`docs/progress/`（INDEX / iterations / ad-hoc / roles）。coordination 仓只记录跨项目事实，不复制单项目内部迭代细节。
+
+## coordination 仓
+
+由 Owner 创建或指定。推荐最小结构：
+
+| 路径 | 作用 |
+|------|------|
+| `README.md` | 生态总览、成员项目、协作入口 |
+| `PROJECTS.md` | 项目目录真源：每个项目的仓库、职责、当前入口、关联沟通文档 |
+| `REQUESTS.md` | 跨项目需求池：提报时不指定承接方，由项目方认领或 Owner 指派 |
+| `STATUS.md` | 跨项目当前状态：谁等谁、阻塞项、下一步 |
+| `CHANGELOG.md` | 跨项目重大事件、契约 breaking change、迁移提醒 |
+| `contracts/` | 跨项目契约单一真源（HTTP schema、事件、字段语义） |
+| `communications/` | 承接后的项目间协作与联调沟通（按项目对，见下） |
+| `decisions/` | 影响两个以上项目的决策记录 |
+
+coordination 仓不承载业务项目的 PRD、设计、测试报告、角色日志；需要项目内部细节时从 `STATUS.md` / `PROJECTS.md` 链接回对应项目文件。
+
+## coordination 仓的发现（位置不靠猜）
+
+跨项目任务在读写 coordination 仓前，必须先确定它的位置，**发现顺序固定**：
+
+1. **用户本次明确指定**的路径 / 仓库；
+2. 否则读本项目 `project-context.md` 「外部依赖与集成」中记录的 `coordination_root`；
+3. 仍找不到 → **询问用户**，由用户确认后可回写到 `project-context.md`。
+
+**禁止**用 sibling path（如 `../niuma-cheng-coordination`）或目录猜测定位（换机器即错）。确定位置后，在本项目记录中写明本次依据的 coordination 仓与 commit。
+
+若 `coordination_root` 记录的是仓库 URL 而非本地路径，**不能直接 `git status` / 写入**：先询问用户使用哪个本地 checkout，或由用户确认 clone 位置后再继续。
+
+## 跨仓写入纪律（红线）
+
+跨项目任务可读写 coordination 仓，但写入前必须：
+
+- **[P0]** 确认 coordination 仓位置（见上）、其 git 同步状态（`git status`，必要时 `pull` 并判断冲突）、本次改动范围；
+- **[P0]** 只写 coordination 的**跨项目事实**（`REQUESTS` / `STATUS` / `contracts` / `communications` / `decisions`）；
+- **[P0]** **不得在 A 项目会话里修改 B 项目的 `docs/progress/`**（INDEX / 迭代 / 角色日志）；被影响项目须在自己仓库内启动对应角色后才更新自身进度；
+- coordination 仓的 commit 同样遵守本项目 `conventions.md` 的协作 commit 纪律（push 前核对 `git diff --stat`）。
+
+## 跨项目需求流转
+
+coordination 提供统一的需求提报中心 `REQUESTS.md`。需求先入池，**提报时不指定承接方**；目标项目的 PM / Architect 按本项目定位评估认领，Owner 可直接指派；**承接之后**才建立沟通文档。
+
+### 生命周期
+
+```text
+已提报(入池, 无承接方) → 评估中 → 已承接 ─┐(或 已拒绝)
+                                        └→ 开发中(转入承接方内部迭代) → 联调中 → 已关闭
+```
+
+### 角色权限（三层）
+
+- **提报**：任一项目的**任一角色**可把需求写入 `REQUESTS.md`，不指定承接方。
+- **承接 / 拒绝**：仅**目标项目的 PM（产品经理）或 Architect（架构师）**评估认领或拒绝（写明理由）；**Owner 可直接指派**承接项目；其他角色不得代为承接。
+- **联调 / 证据更新**：承接后由相关角色（通常 Developer）执行联调并更新证据。
+
+### REQUESTS.md 字段
+
+| 字段 | 说明 |
+|------|------|
+| 需求 id | 稳定短号，如 `REQ-001` |
+| 提出方 | 项目 · 角色 |
+| 内容 | 需求一句话 + 必要背景 |
+| 状态 | 见生命周期 |
+| 承接方 | 承接后填（项目 + PM/Architect）；未承接留空 |
+| 转入迭代 | 承接方项目 `vX.Y`（进入开发中后填） |
+| 沟通文档 | 承接后指向 `communications/{a}__{b}.md` |
+
+### 与项目内部迭代的衔接
+
+承接后，承接方 PM / Architect 把需求**转换为本项目内部标准迭代**（按 `multi-agent-workflow.md` 走 PRD → … → 测试），独立开发。`REQUESTS.md` 与沟通文档只登记「已转入 {项目} vX.Y」并链接回该项目 `docs/progress/INDEX.md`，**不复制迭代细节**；开发完成后回沟通文档联调。
+
+### 会话边界
+
+一个会话只承担一个项目的一个角色：
+
+- 提报：提出方角色在自己会话里写 `REQUESTS.md`。
+- 承接 / 拒绝：目标项目 PM/Architect 在**目标项目会话**评估回写；不能在提出方会话替目标项目承接（Owner 指派除外）。
+- 转入迭代后，开发在承接方项目会话内按其工作流进行。
+
+## communications（按项目对）
+
+**每一对存在协作的项目共用一份沟通文档**，按项目对命名 `communications/{project-a}__{project-b}.md`（项目 id 按字典序），承载这对项目之间**所有**跨项目需求从承接到关闭的沟通过程（需求澄清、承接确认、转入迭代、联调对接，倒序时间线）。
+
+- **创建时机**：这对项目间**首个需求被承接**后创建；提报 / 评估 / 拒绝阶段只在 `REQUESTS.md` 跟踪，不建沟通文档。
+- **职责分工**：`REQUESTS.md` 做**状态跟踪**（所有需求一览 + 各自状态），沟通文档做**沟通过程**；每条需求在 `REQUESTS.md` 反向链接到所属项目对沟通文档。
+- `PROJECTS.md` 必须反向链接每份沟通文档，避免孤儿记录。
+- 涉及接口 / 字段的，契约以 `contracts/` 为单一真源。
+
+头部必须写清：
+
+```markdown
+# {project-a} ↔ {project-b} 跨项目沟通
+
+- 参与项目：{project-a}, {project-b}
+- 相关需求：REQ-xxx, REQ-yyy（状态见 ../REQUESTS.md）
+- 契约真源：contracts/{name}.md（涉及接口/字段时）
+- 最近更新：YYYY-MM-DD
+```
+
+## 契约真源
+
+跨项目契约必须单一真源，默认放 coordination 仓 `contracts/`：
+
+1. 改跨项目 API / schema / 事件 / 字段语义 / 错误码前，**先改 `contracts/`**。
+2. 改后在 `CHANGELOG.md` 记影响范围、是否 breaking、哪些项目需跟进。
+3. 各项目按契约改代码，并在本项目 `INDEX.md` / ad-hoc / 迭代记录写清已跟进的 coordination 版本或 commit。
+4. 不允许两个项目各自维护互相冲突的契约说明。
+
+coordination 仓尚未创建时，可在发起项目写临时提案并标「临时真源」，待仓库创建后迁入 `contracts/` 并留引用。
+
+## 开工前同步
+
+涉及跨项目的任务，当前角色进入具体工作前必须：
+
+1. 按「发现机制」定位并拉取 / 查看 coordination 仓最新状态；
+2. 读 `STATUS.md`；涉及契约再读对应 `contracts/`；
+3. 判断本项目是否等待其他项目、是否会阻塞其他项目；
+4. 在本项目记录写明 coordination 依据。
+
+普通单项目任务不读 coordination 仓。
+
+## 跨项目交接
+
+一边完成会影响另一边时，留两处记录：
+
+1. **本项目**：更新本项目 `INDEX.md` / 迭代 / ad-hoc，说明完成内容和对外影响；
+2. **coordination**：更新 `STATUS.md`，点名被影响项目和下一步责任；契约变更再更新 `CHANGELOG.md`。
+
+交接不等于替对方推进状态——被影响项目须在自己仓库内启动对应角色后才更新自身进度（见跨仓写入纪律）。
+
+## 新项目复用团队工作流
+
+新项目只复用基线规则和模板，不继承源项目的动态进度。
+
+1. 在真源仓库运行 `scripts/install-downstream.sh <目标目录>` 产出干净副本（自动剥离 SOURCE-REPO-ONLY、带 `docs/baseline` + `docs/templates` + 空 `docs/knowledge` 骨架、铺 `project-context.md` 占位，不带真源专属文件）。
+2. 填写 `project-context.md` 项目事实（安装脚本已铺占位；项目事实层，与 Bootstrap 无关）；如属某生态，在「外部依赖与集成」记录 `coordination_root`。
+3. 在目标项目进入团队模式；缺 `docs/progress/INDEX.md` 时按目标项目内 Bootstrap 初始化工作台，并在 `INDEX.md` 记录结果。
+4. 该项目属某多项目生态时，在 coordination 仓 `README.md` / `PROJECTS.md` / `STATUS.md` 登记。
+
+**禁止**：复制源项目 `docs/progress/` 作为新项目初始状态；复制 `project-context.md` 后不改项目事实；新项目 Bootstrap 后默认进标准迭代。
+
+## 与单项目基线的关系
+
+- `runtime.md` 决定何时加载本文件（仅跨项目任务）。
+- `multi-agent-workflow.md` 定义单项目内角色、阶段与 Review。
+- `mechanisms.md` 定义 Bootstrap、收尾、关闭检查、流程审计。
+- 本文件只补充跨项目真源、交接与新项目复用规则。
