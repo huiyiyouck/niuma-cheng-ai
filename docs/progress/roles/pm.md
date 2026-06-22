@@ -12,4 +12,4 @@
   - ai 代码各节点仍为 stub（`graphs/news_l1.py` `llm_process` 返回占位评分/标签/摘要/翻译），真实 L1 处理待 v0.1 迭代实现。
   - `project-context.md` 的「项目一句话/业务边界」仍为「xiaobao 新闻专用」旧定位，与 Owner 新确立的「生态内部多项目通用 AI 中枢」定位不一致，待后续更新。
 - 下一步入口：Owner 确认启动 ai v0.1 标准迭代时，由 PM 创建 `docs/progress/iterations/v0.1-prd.md`，把 REQ-001 转为标准迭代。
-- 收尾状态：未收尾
+- 收尾状态：已收尾（2026-06-22，两仓改动已 commit/push：ai `752bf14`、coordination `ab2543c`）
