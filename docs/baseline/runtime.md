@@ -32,7 +32,7 @@
 | 产品想法、UI 草案、技术预研、运维任务 | 非迭代方案 / 预研 / 任务 | `non-iteration-quick.md`、相关 ad-hoc |
 | 今天收尾、下班、先停一下 | 收尾归档 | `mechanisms.md`；达阈值再读 `context-policy.md` |
 | 迭代是否结束、关闭版本 | 迭代关闭检查 | `mechanisms.md`、当前迭代记录、必要 summary |
-| 发现规则需改、增删角色 | 基线修正提案 | 只写 `[基线修正提案]` 带回真源，不在本项目改 baseline |
+| 发现规则需改、增删角色 | 基线修正提案 | 写 `BCR-###` 入 coordination 基线修正提案池（见 `cross-project-collaboration.md`），不在本项目改 baseline |
 | 跨项目需求 / 契约 / 状态、读写 coordination 仓 | 跨项目协作 | `cross-project-collaboration.md`；按其发现机制定位 coordination 仓 |
 | 查询经验、写入长期知识 | 知识库 | `knowledge-base.md`、`docs/knowledge/INDEX.md` |
 
@@ -47,7 +47,7 @@
 - **[P0]** 标注 AI 协作信息的 commit，push 前贴 `git diff --stat` 核对；与 message 范围不符则停等 Owner。
 - **[P0]** Review 阶段不得改产出正文，只能追加 Review 章节。
 - **[P0]** 未初始化项目须用户确认才能 Bootstrap 写入文件。
-- **[P0]** 基线修正只能写提案，不在下游项目直接改 `baseline/`。
+- **[P0]** 基线修正只能写 `BCR-###` 入 coordination 基线修正提案池，不在下游项目直接改 `baseline/`。
 - **[P0]** 跨仓写入：写 coordination 协调仓前先确认仓位置（按发现机制，不猜路径）+ git 同步状态 + 改动范围；只写跨项目事实，**不在 A 项目会话改 B 项目 `docs/progress/`**（详见 `cross-project-collaboration.md`）。
 - **[P1]** 机制（Bootstrap / 收尾 / 关闭 / 审计）不得代写其他角色结论或角色日志；禁止直接改他人角色日志。
 - **[P1]** 标准迭代核心产出默认 ≥2 个 Review 方，少于 2 须用户确认。
@@ -59,7 +59,7 @@
 
 - 删除受保护路径 → `conventions.md §受保护路径删除 Review 门禁`。
 - 收尾 / 关闭 / 审计机制 → `mechanisms.md`。
-- 基线修正 / 增删角色 → `multi-agent-workflow.md §14、§15`。
+- 基线修正 / 增删角色 → `cross-project-collaboration.md §基线修正提案流转（BCR）`、`multi-agent-workflow.md §14、§15`。
 - 标准迭代协议 → `standard-iteration-quick.md`；非迭代协议 → `non-iteration-quick.md`；再深则 `multi-agent-workflow.md` / `work-modes.md`。
 - 跨项目需求 / 契约 / 状态、读写 coordination 仓 → `cross-project-collaboration.md`。
 - 角色日志归档阈值 → `context-policy.md`。

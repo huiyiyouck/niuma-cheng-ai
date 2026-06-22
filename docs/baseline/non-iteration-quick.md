@@ -13,7 +13,7 @@
 | UI Concept / UI 草案 | 界面 / 交互 / 视觉探索 | UI | 草案 + UI 日志 |
 | Tech Spike / 技术预研 | 验证库 / 架构 / 性能可行性 | Architect / Developer | 结论 + 建议 |
 | Ops Task / 运维任务 | 部署外部 / 开源、环境、脚本 | DevOps | 命令 / 配置摘要 + 验证 |
-| Workflow Audit / 流程审计 | 状态混乱、角色冲突、基线疑问 | 当前会话 Agent | 审计结论 + 基线修正提案 |
+| Workflow Audit / 流程审计 | 状态混乱、角色冲突、基线疑问 | 当前会话 Agent | 审计结论 + `BCR-###` 入 coordination |
 
 ## 模式选择
 
