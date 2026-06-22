@@ -1,5 +1,18 @@
 # PM（产品经理）角色日志
 
+## 2026-06-22 — 会话摘要（BCR-002 真源回流）
+- 本次角色：PM（产品经理）
+- 动作：从框架真源同步工作流基线（`sync-downstream.sh`），回流 BCR-002。
+- 涉及文档：本项目 `.workflow-version`、`docs/baseline/cross-project-collaboration.md`、`docs/progress/INDEX.md`；coordination 仓 `REQUESTS.md`、`PROJECTS.md`、`communications/README.md`。
+- 结论：本项目 baseline 由 `agent-workflow@c8c66ce` 同步至 `@1b01fba`，已包含 BCR-002 真源落地：跨项目 `communications/` 从「按项目对一份」改为「按需求一份」，命名为 `communications/{REQ-id}-{短名}.md`，REQ 与沟通文档一一对应。
+- coordination 依据：`/root/Project/niuma-cheng-coordination`，同步前 `git pull --rebase` 已是最新；BCR-002 真源落地记录为 `b5a29a3`（merge `0a76dca`），真源当前 HEAD `1b01fba`；coordination 最新记录 `0dd6e02` 已将 BCR-002 置为「已回流下游」（ai `1b01fba`、xiaobao `91b442a`）。
+- 关联迭代：无（框架维护，非迭代）
+- 关联非迭代工作：BCR-002 真源回流（见 `INDEX.md` 非迭代工作表）
+- 关联 Change Note：无
+- 遗留问题/风险：无。BCR-002 已在 coordination 置为「已回流下游」；本会话未改 xiaobao `docs/progress/`。
+- 下一步入口：REQ-001 下一步不变——Owner 确认后由 PM 创建 `v0.1-prd.md` 启动标准迭代。
+- 收尾状态：已完成（2026-06-22）
+
 ## 2026-06-22 — 会话摘要（工作流真源同步）
 - 本次角色：PM（产品经理）
 - 动作：从框架真源同步工作流基线（`sync-downstream.sh`）
