@@ -180,6 +180,9 @@ Change Note 的状态流转为：
 6. Change Note 均已归档、废弃，或明确转入下一迭代。
 7. 迭代摘要和知识库沉淀已完成，或写明不需要沉淀的原因。
 8. 本迭代是否有后端能力废弃？若有，关闭检查执行者必须核对前端引用是否为零（详见 `role-developer.md` §跨轮契约变更同步）；涉及测试判断或无法判断时，切换到 Tester（测试工程师）或请求 Tester Review。
+9. 本迭代是否变更了项目定位 / 名称 / 技术栈 / 上线状态 / 工作流接入状态？若否，跳过。若是：
+   - 本项目属多项目生态且已配置 / 确认 coordination → 按 `cross-project-collaboration.md` 的 coordination 发现机制与跨仓写入纪律处理（§项目元信息同步）：有写权限时在协调台账 `STATUS.md`「元信息变更台账」登记一行（项目 / 字段 / old / new / 来源）；无写权限时输出待登记行转交有权限会话；
+   - 无 coordination → 在本次迭代关闭记录中登记「本次元信息变更未同步生态台账（无 coordination）」，并提示 Owner 是否建立 coordination。
 
 ### 输出
 
