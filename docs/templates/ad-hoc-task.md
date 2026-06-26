@@ -2,7 +2,7 @@
 
 ## 基本信息
 - 日期：
-- 模式：Bugfix / Incident / Product Brief / UI Concept / Tech Spike / Ops Task / Workflow Audit
+- 模式：Bugfix / Incident / Product Brief / 界面草案 / Tech Spike / Ops Task / Workflow Audit
 - 执行角色：
 - 是否进入迭代：否
 - 关联迭代：（如无，写“无”）

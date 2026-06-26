@@ -31,7 +31,7 @@
 ### 多 Agent 协作标记
 `[角色] 动作 — 详情`（用于 Agent 之间传递协作信号）
 
-**角色标识**：PM、Architect、Developer、Tester、DevOps、UI
+**角色标识**：PM、Architect、Developer、DevOps
 
 **动作关键词**：待Review、Reviewed、已定稿、会话记录、基线修正
 

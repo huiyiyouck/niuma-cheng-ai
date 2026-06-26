@@ -37,7 +37,7 @@ coordination 仓     ← 跨项目契约与状态的单一真源
 | `communications/` | 承接后的项目间协作与联调沟通（按需求一份，见下） |
 | `decisions/` | 影响两个以上项目的决策记录 |
 
-coordination 仓不承载业务项目的 PRD、设计、测试报告、角色日志；需要项目内部细节时从 `STATUS.md` / `PROJECTS.md` 链接回对应项目文件。
+coordination 仓不承载业务项目的 PRD、设计、自测报告、角色日志；需要项目内部细节时从 `STATUS.md` / `PROJECTS.md` 链接回对应项目文件。
 
 ## coordination 仓的发现（位置不靠猜）
 

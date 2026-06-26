@@ -1,16 +1,22 @@
-# vX.Y 测试报告
+# vX.Y Developer 自测报告
+
+> 测试阶段已并入实现：Developer 实现完成即做自测（接口/自动化），**证据必留**。手动点击验收由 Owner 在迭代关闭前完成（见迭代记录「Owner 验收」）。
 
 ## 文档状态
 - 整体状态：待Review
 - Review 轮次：R1
 - 关联迭代：
 
-> 从此处插入 Review 计划、Review 状态和 Review 记录三个区块，内容见 `docs/templates/review-plan.md`
+> 从此处插入 Review 计划、Review 状态和 Review 记录三个区块，内容见 `docs/templates/review-plan.md`。「验收标准 / 边界 / 回归」的独立复核由 Architect 或 DevOps 承担（PM 产出验收标准时不自审）。
 
 ## 结论
-- 最终判定：通过 / 阻塞 / 有条件通过
+- 自测判定：通过 / 阻塞 / 有条件通过
 
-## 执行范围
+## 自测范围（四维）
+- 正常路径：
+- 边界值：
+- 异常路径：
+- 状态转换：
 
 ## 结果摘要
 

@@ -4,7 +4,7 @@
 
 ## 子 Agent 调度流程
 
-前置：确认 UI 方案（或已跳过）和设计文档均已定稿。
+前置：确认设计文档已定稿（界面要点在 PRD 内）。
 
 1. 将实现任务拆解为前端任务和后端任务。
 2. 读取 `docs/baseline/subagents/sub-frontend.md` 和 `sub-backend.md`。

@@ -29,7 +29,7 @@
 |----------|------|----------|
 | 做版本、迭代、完整功能落地 | 标准迭代 | `standard-iteration-quick.md`、当前 `vX.Y.md` 相关阶段；非 PM 先询问转 PM |
 | Bug、线上问题、临时修复 | 非迭代 Bugfix / Incident | `non-iteration-quick.md`、相关 ad-hoc |
-| 产品想法、UI 草案、技术预研、运维任务 | 非迭代方案 / 预研 / 任务 | `non-iteration-quick.md`、相关 ad-hoc |
+| 产品想法、界面草案、技术预研、运维任务 | 非迭代方案 / 预研 / 任务 | `non-iteration-quick.md`、相关 ad-hoc |
 | 今天收尾、下班、先停一下 | 收尾归档 | `mechanisms.md`；达阈值再读 `context-policy.md` |
 | 迭代是否结束、关闭版本 | 迭代关闭检查 | `mechanisms.md`、当前迭代记录、必要 summary |
 | 发现规则需改、增删角色 | 基线修正提案 | 写 `BCR-###` 入 coordination 基线修正提案池（见 `cross-project-collaboration.md`），不在本项目改 baseline |
@@ -63,7 +63,7 @@
 - 标准迭代协议 → `standard-iteration-quick.md`；非迭代协议 → `non-iteration-quick.md`；再深则 `multi-agent-workflow.md` / `work-modes.md`。
 - 跨项目需求 / 契约 / 状态、读写 coordination 仓 → `cross-project-collaboration.md`。
 - 角色日志归档阈值 → `context-policy.md`。
-- 新建文档读 `docs/templates/` 对应模板：`prd` / `ui-spec` / `design` / `test-plan` / `change-note` / `iteration-summary` / `progress-index`。
+- 新建文档读 `docs/templates/` 对应模板：`prd`（含界面要点）/ `design` / `change-note` / `iteration-summary` / `progress-index`；Developer 自测用 `test-report`（自测报告）。
 
 ## 不默认读取
 

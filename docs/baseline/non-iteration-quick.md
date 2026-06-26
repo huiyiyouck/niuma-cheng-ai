@@ -7,7 +7,7 @@
 
 | 模式 | 适用 | 执行角色 | 最低记录 |
 |------|------|----------|----------|
-| Bugfix / 线上问题 | 功能 Bug、小范围修复 | Developer(+Tester/DevOps) | Bugfix 记录 + 验证证据 |
+| Bugfix / 线上问题 | 功能 Bug、小范围修复 | Developer(+DevOps) | Bugfix 记录 + 验证证据 |
 | Incident / 故障 | 服务不可用、数据异常、安全、部署事故 | DevOps / Developer | 时间线 + 根因 + 后续动作 |
 | Product Brief / 产品方案 | 想法、需求探索，未定落地 | PM | 方案文档 + PM 日志 |
 | UI Concept / UI 草案 | 界面 / 交互 / 视觉探索 | UI | 草案 + UI 日志 |

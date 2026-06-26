@@ -11,11 +11,10 @@
 ## 关键决策
 
 ## Review 和质量结论
-- PRD：
-- UI：
+- PRD（含界面要点）：
 - 设计：
 - 实现：
-- 测试：
+- 自测/验收（Developer 自测 + Owner 验收）：
 - 部署：
 
 ## Change Notes

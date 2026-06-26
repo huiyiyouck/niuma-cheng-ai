@@ -50,11 +50,9 @@ docs/knowledge/
 
 每个角色都可以向自己领域的知识库写入内容：
 
-- PM（产品经理）写 `product/`、`opportunities/`
-- UI（界面设计师）写 `ui/`
+- PM（产品经理）写 `product/`、`opportunities/`、`ui/`（界面要点知识）
 - Architect（架构师）写 `architecture/`、`decisions/`
-- Developer（开发工程师）写 `engineering/`
-- Tester（测试工程师）写 `testing/`
+- Developer（开发工程师）写 `engineering/`、`testing/`（自测知识）
 - DevOps（运维/部署工程师）写 `devops/`
 
 ## 什么时候写入知识库
