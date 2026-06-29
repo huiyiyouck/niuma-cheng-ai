@@ -1,5 +1,20 @@
 # PM（产品经理）角色日志
 
+## 2026-06-29 — 会话摘要（产品定位升级 + REQ-002 承接）
+- 本次角色：PM（产品经理，ck）
+- 动作：理清 ai 产品定位 → Owner 拍板正式升级定位 + 跨仓决策/承接/元信息留痕（非迭代 Product Brief）。
+- 背景纠偏：初次跳过调研、直接用选项题拍定位（与已拍板 D5 冲突），经 Owner 指正后补做 coordination 真源调研（`contracts`/`decisions`/`REQUESTS`/`communications`/`STATUS`），发现 ① D5「不做泛化多项目通用平台」② 待承接的 REQ-002 架构调研。
+- 产品定位结论：Owner 2026-06-29 拍板把 ai 从 D5「xiaobao 专属」升级为「**niuma-cheng 生态内部通用 AI 处理中枢**」；仅 supersede D5，D1–D4 仍有效；落地「通用骨架预留扩展点 + 先做 xiaobao news-l1」，v0.1 不为不存在的第二调用方写实现。定位 Brief 经两轮 Owner review 定稿。
+- coordination 留痕（已 push，commit `7fa7820`）：新建 `decisions/0002`（supersede D5）+ `0001` 标注；`REQUESTS` 回填 REQ-002 ai PM 承接 + 建 `communications/REQ-002-arch-research.md`；`STATUS` 元信息台账登记 ai「定位」变更（第 1 棒，PROJECTS/根索引同步转协调/根会话）。
+- 角色边界：数据架构定位属 Architect，本会话未替架构拍板；REQ-002 架构方案实质产出归 Architect。
+- 关联迭代：v0.1（待启动，前置 REQ-002 架构调研）
+- 关联非迭代工作：产品定位升级 Product Brief（见 `ad-hoc/2026-06-29-product-brief-positioning.md`）
+- 关联 Change Note：无
+- 遗留问题/风险：元信息同步差第 2/3 棒（`PROJECTS.md` / 根索引）未闭环，已登记台账转交对应会话。
+- 下一步入口：切 Architect 承接 REQ-002 做数据架构定位（读 Horizon/aggregator、答 4 岔路口）→ 回 PM 创建 `v0.1-prd.md`。
+- coordination 依据：`/root/Project/niuma-cheng-coordination`，操作前 already up to date（HEAD `85fc21f` → push `7fa7820`）。
+- 收尾状态：已收尾（2026-06-29）
+
 ## 2026-06-22 — 会话摘要（BCR-002 真源回流）
 - 本次角色：PM（产品经理）
 - 动作：从框架真源同步工作流基线（`sync-downstream.sh`），回流 BCR-002。
