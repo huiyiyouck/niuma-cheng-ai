@@ -11,7 +11,8 @@
 3. `docs/baseline/project-context.md`（如存在）
 4. `docs/progress/INDEX.md`（如存在）
 5. 当前角色手册 `docs/baseline/role-{role}.md`（已指定角色时）
-6. 当前角色日志摘要：优先 `{role}-current.md` / `{role}-summary.md`，否则读 `roles/{role}.md` 最近 10 条或头部摘要；`{role}-corrections.md` 仅复盘 / Review 失败时读。
+6. 当前角色日志摘要：优先 `{role}-current.md` / `{role}-summary.md`，否则读 `roles/{role}.md` 最近 10 条或头部摘要。
+7. **进入标准迭代各阶段时**，本角色 `docs/progress/roles/{role}-corrections.md` **强制全读**（有界 ≤30 条、角色专属、是本角色犯过的流程错，信噪比最高、token 省，属蒸馏结论非过程轨迹）。**文件不存在视为空 corrections（无需创建、直接跳过，不构成阻塞；需记录首条纠错时才从 `docs/templates/role-corrections.md` 创建）。** 非迭代 / 收尾 / 关闭等场景仍按需读（复盘 / Review 失败时）。
 
 未指定角色时先问以哪个角色继续，不为猜角色加载所有手册；General 不进入本路由。
 

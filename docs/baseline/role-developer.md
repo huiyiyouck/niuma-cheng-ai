@@ -74,6 +74,8 @@
 
 具体调度流程、验证失败处理、并行限制见 `docs/baseline/role-developer-detail.md`（按需读取）。
 
+设计文档涉及子 Agent 并行实现时，Developer 应作为该设计文档的 Review 方（`multi-agent-workflow.md` §9.1），在实现会话开始前基于接口契约提**待澄清问题**，答案由 Architect 回填正文——避免隔离的实现会话及子 Agent 拿到含糊契约。
+
 ### 跨轮契约变更同步
 
 #### 背景
