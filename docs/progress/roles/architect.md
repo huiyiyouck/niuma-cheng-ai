@@ -1,5 +1,13 @@
 # Architect 角色日志
 
+## 2026-06-30 — v0.1 详细设计 R1（Architect）
+- 本次角色：Architect（架构师）
+- 动作：标准迭代设计阶段 R1 初版
+- 涉及文档：`docs/progress/iterations/v0.1-design.md`；ADR `docs/knowledge/decisions/0001-news-l1-deterministic-conditional-graph.md`、`docs/knowledge/decisions/0002-openai-compatible-chained-llm-client.md`；同步 `docs/knowledge/INDEX.md`、`docs/progress/iterations/v0.1.md`、`docs/progress/INDEX.md`
+- 结论：设计 R1 已提交 Review；指定 PM、Developer、DevOps 作为 Review 方。
+- 设计要点：对外契约不变；内部 task registry；确定性条件图；OpenAI 兼容链式 LLM client；Tavily adapter；预取上下文不计 `tool_summary`；部分可用结果按 `succeeded` 降级语义返回。
+- 下一步入口：PM、Developer、DevOps Review `v0.1-design.md`；通过后设计定稿并进入实现阶段。
+
 ## 2026-06-30 — v0.1 PRD R2 复审（Architect）
 - 本次角色：Architect（架构师）
 - 动作：标准迭代 PRD R2 复审

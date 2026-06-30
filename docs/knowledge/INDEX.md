@@ -16,7 +16,9 @@
 
 ## Decisions（决策）
 
+- [ADR-0001: news-l1 采用确定性条件图编排](decisions/0001-news-l1-deterministic-conditional-graph.md)
+- [ADR-0002: 移植裁剪后的 OpenAI 兼容链式 LLM client](decisions/0002-openai-compatible-chained-llm-client.md)
+
 ## Opportunities（机会池）
 
 ## Retrospectives（复盘）
-
