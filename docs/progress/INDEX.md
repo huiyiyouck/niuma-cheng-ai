@@ -6,9 +6,9 @@
 
 - 当前迭代：v0.1（标准迭代 — REQ-001 news-l1 真实化）
 - 当前模式：标准迭代
-- 当前阶段：PRD 阶段 — R2 待 Review（PM 已据 R1 反馈修改，等待 Architect、Developer 复审；见 `iterations/v0.1.md`）
+- 当前阶段：设计阶段 — PRD R2 已定稿，待 Architect 创建设计文档（见 `iterations/v0.1.md`）
 - 阻塞项：无
-- 下一步入口：Architect、Developer R2 复审 `v0.1-prd.md`；通过定稿后进设计阶段（Architect 落岔路口①③ ADR）
+- 下一步入口：Architect 创建设计文档；落条件图编排与 LLM client 移植 ADR
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -21,7 +21,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
-| v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | — | — | 进行中 · PRD R2 待 Review |
+| v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | — | — | 进行中 · PRD 已定稿，设计待启动 |
 
 ## 当前 Change Notes
 

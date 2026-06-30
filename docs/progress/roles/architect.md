@@ -1,5 +1,13 @@
 # Architect 角色日志
 
+## 2026-06-30 — v0.1 PRD R2 复审（Architect）
+- 本次角色：Architect（架构师）
+- 动作：标准迭代 PRD R2 复审
+- 涉及文档：`docs/progress/iterations/v0.1-prd.md`、`docs/progress/iterations/v0.1.md`、`docs/progress/INDEX.md`；复核 coordination `contracts/news-l1.md`
+- 结论：通过；PRD 阶段已定稿，可进入设计阶段。
+- 确认：AC-9 已收敛为内部 registry / dispatch，不改对外契约；AC-6 已对齐 `RunResponse` v1；AC-5 已明确 URL 来源与 `tool_summary` 主动调用统计口径；AC-7 配置细节留设计阶段落定。
+- 下一步入口：Architect 创建设计文档，并落条件图编排与 LLM client 移植 ADR。
+
 ## 2026-06-30 — v0.1 PRD R1 Review（Architect）
 - 本次角色：Architect（架构师）
 - 动作：标准迭代 PRD R1 Review

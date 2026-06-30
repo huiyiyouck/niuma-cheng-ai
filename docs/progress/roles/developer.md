@@ -1,5 +1,17 @@
 # Developer 角色日志
 
+## 2026-06-30 — v0.1 PRD R2 复审
+- 本次角色：Developer
+- 动作：Review
+- 涉及文档：`docs/progress/iterations/v0.1-prd.md`、`docs/progress/iterations/v0.1.md`、`docs/progress/INDEX.md`；核对 `src/agent_hub/{main.py,schemas.py,graphs/news_l1.py,config.py}` 与 `tests/test_health.py`
+- 结论：PRD R2 Developer 复审通过。R1 的实现阻塞点已处理：AC-9 收敛为内部 registry 且不改对外契约；AC-6 降级状态语义可测试；AC-5 URL 来源和 `tool_summary` 口径明确；AC-7 provider 配置细节留设计阶段落定。
+- 关联迭代：v0.1
+- 关联非迭代工作：无
+- 关联 Change Note：无
+- 遗留问题/风险：实现阶段需调整现有骨架测试中预取 `kb_results` 计入 `tool_summary.kb_search` 的旧口径；Architect R2 仍待复审。
+- 下一步入口：Architect R2 复审 `v0.1-prd.md`；若通过则 PRD 可定稿并进入设计阶段。
+- 收尾状态：已收尾
+
 ## 2026-06-30 — v0.1 PRD R1 Review
 - 本次角色：Developer
 - 动作：Review
