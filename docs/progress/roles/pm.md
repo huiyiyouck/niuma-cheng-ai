@@ -1,5 +1,16 @@
 # PM（产品经理）角色日志
 
+## 2026-06-29 — 会话摘要（v0.1 PRD 启动 + 工具能力诉求）
+- 本次角色：PM（产品经理，ck）
+- 动作：据 REQ-002 架构结论创建 v0.1 PRD 启动标准迭代；在 REQ-001 交流文档向 xiaobao 提工具能力诉求（非新需求，派生自 REQ-001 的协作沟通）。
+- 产出：`iterations/v0.1-prd.md`（R1 待 Review）、`iterations/v0.1.md`（迭代记录）；INDEX 切「v0.1 标准迭代 · PRD 阶段」。
+- v0.1 范围（Owner 确认）：news-l1 五项**全量**真实化（路径=先最小骨架跑通→逐项填满）；多 provider fallback **进**、RunRecord **延后**；生态薄接缝只留接口形状。不做 L0 / `score_total` / 强重入 / 第二调用方实现 / 改契约。
+- 工具后端分工（Owner 2026-06-29 拍定）：**KB 检索→xiaobao 提供**（已在 REQ-001 交流文档提诉求，coordination 待响应）；**链接读取→ai 自抓 HTTP**；**Web 搜索→Owner 提供 key、ai 自配**。
+- Review：指定 Architect + Developer，PRD R1 Review中。
+- 关联迭代：v0.1（PRD 阶段）
+- 遗留/下一步：Owner 待办——提供 web search key；切 Architect/Developer 做 PRD R1 Review；KB 检索待 xiaobao 响应（交流文档「待跟进」已登记）。
+- 收尾状态：进行中（迭代 PRD 阶段，未收尾）
+
 ## 2026-06-29 — 会话摘要（产品定位升级 + REQ-002 承接）
 - 本次角色：PM（产品经理，ck）
 - 动作：理清 ai 产品定位 → Owner 拍板正式升级定位 + 跨仓决策/承接/元信息留痕（非迭代 Product Brief）。

@@ -4,11 +4,11 @@
 
 ## 当前项目状态
 
-- 当前迭代：无
-- 当前模式：非迭代（Product Brief 已完成）
-- 当前阶段：产品定位已升级为「**niuma-cheng 生态内部通用 AI 处理中枢**」（Owner 2026-06-29 拍板；coordination `decisions/0002` supersede D5，已 push `7fa7820`）；**REQ-002 数据架构调研已完成**（Architect 2026-06-29，4 岔路口已答，见 ad-hoc spike）；REQ-001 解除前置阻塞、待 PM 立项；代码各节点仍为 stub（`graphs/news_l1.py` `llm_process` 占位）
+- 当前迭代：v0.1（标准迭代 — REQ-001 news-l1 真实化）
+- 当前模式：标准迭代
+- 当前阶段：PRD 阶段 — R1 已起草，Review中，等待 Architect 和 Developer 反馈（见 `iterations/v0.1.md`）
 - 阻塞项：无
-- 下一步入口：回 PM 据 REQ-002 架构结论创建 `v0.1-prd.md` 启动标准迭代（REQ-001 L1 真实化）；设计阶段把岔路口①③各落一份 ADR
+- 下一步入口：Architect、Developer Review `v0.1-prd.md`（R1）；通过定稿后进设计阶段（Architect 落岔路口①③ ADR）
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -21,6 +21,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
+| v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | — | — | 进行中 · PRD R1 Review中 |
 
 ## 当前 Change Notes
 
@@ -63,7 +64,7 @@
 
 | 优先级 | 待办 | 归属角色 | 来源 | 状态 |
 |--------|------|----------|------|------|
-| P1 | REQ-001 启动 v0.1 标准迭代实现真实 L1 处理（stub→真实）；**前置 REQ-002 架构结论** | PM | xiaobao 提报 REQ-001 / Owner 立项 | 待启动（候 REQ-002） |
+| P1 | REQ-001 真实 L1 处理（stub→真实）已转入 v0.1 标准迭代，由迭代记录跟踪 | PM | xiaobao 提报 REQ-001 / Owner 立项 | 已转入 v0.1（PRD R1 Review中） |
 | P1 | REQ-002 数据架构调研：读 Horizon/aggregator、答 4 岔路口、出数据架构方案 | Architect | Owner 指派 REQ-002 / 2026-06-29 ai PM 承接 | 已完成（2026-06-29，见 ad-hoc spike） |
 
 ## Bootstrap 记录
