@@ -6,9 +6,9 @@
 
 - 当前迭代：无
 - 当前模式：非迭代（Product Brief 已完成）
-- 当前阶段：产品定位已升级为「**niuma-cheng 生态内部通用 AI 处理中枢**」（Owner 2026-06-29 拍板；coordination `decisions/0002` supersede D5，已 push `7fa7820`）；已承接 REQ-002（架构调研，前置 REQ-001）；REQ-001/REQ-002 均待启动；代码各节点仍为 stub（`graphs/news_l1.py` `llm_process` 占位）
+- 当前阶段：产品定位已升级为「**niuma-cheng 生态内部通用 AI 处理中枢**」（Owner 2026-06-29 拍板；coordination `decisions/0002` supersede D5，已 push `7fa7820`）；**REQ-002 数据架构调研已完成**（Architect 2026-06-29，4 岔路口已答，见 ad-hoc spike）；REQ-001 解除前置阻塞、待 PM 立项；代码各节点仍为 stub（`graphs/news_l1.py` `llm_process` 占位）
 - 阻塞项：无
-- 下一步入口：切 Architect 承接 REQ-002 做数据架构定位（读 Horizon/aggregator、答 4 岔路口）→ 回 PM 创建 `v0.1-prd.md` 启动标准迭代
+- 下一步入口：回 PM 据 REQ-002 架构结论创建 `v0.1-prd.md` 启动标准迭代（REQ-001 L1 真实化）；设计阶段把岔路口①③各落一份 ADR
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -31,6 +31,7 @@
 
 | 日期 | 模式 | 记录 | 状态 | 下一步 |
 |------|------|------|------|------|
+| 2026-06-29 | Tech Spike·REQ-002 数据架构调研 | Architect 调研 Horizon/aggregator，答 4 岔路口 + 生态骨架接缝，见 `ad-hoc/2026-06-29-spike-req002-data-architecture.md` | 已完成 | 回 PM 创建 v0.1 PRD；设计阶段落岔路口①③ 的 ADR |
 | 2026-06-29 | 跨项目协作·产品定位升级 + REQ-002 承接 | 定位 Brief `ad-hoc/2026-06-29-product-brief-positioning.md`；coordination `decisions/0002` + `REQUESTS` + `STATUS` 台账（push `7fa7820`） | 已完成 | 切 Architect 做数据架构定位（REQ-002）；元信息同步第 2/3 棒转协调/根会话 |
 | 2026-06-22 | 框架维护·BCR-002 回流 | baseline 同步至 `agent-workflow@1b01fba`（BCR-002 communications 按需求一份），见 PM 日志 | 已完成 | coordination BCR-002 已置「已回流下游」 |
 | 2026-06-22 | 框架维护·工作流真源同步 | baseline 同步至 `agent-workflow@c8c66ce`（P8 BCR 机制），见 PM 日志 | 已完成 | 框架变更今后走 `BCR-###` |
@@ -40,6 +41,7 @@
 
 | 日期 | 角色 | 工作 | 结论 | 下一步入口 |
 |------|------|------|------|------------|
+| 2026-06-29 | Architect | REQ-002 数据架构调研：4 岔路口已答 + 生态骨架接缝（见 `ad-hoc/2026-06-29-spike-req002-data-architecture.md`） | 已完成（待 Owner/PM Review） | PM 创建 `v0.1-prd.md`；coordination REQ-002 回执待跟进 |
 | 2026-06-29 | PM | ai 产品定位升级生态内部通用 AI 中枢 + REQ-002 承接 + 元信息台账（coordination push `7fa7820`） | 已完成 | 切 Architect 做数据架构定位（REQ-002）→ PM 创建 v0.1 PRD |
 | 2026-06-22 | PM | BCR-002 真源回流到 ai baseline → `agent-workflow@1b01fba` | 已完成 | BCR-002 已闭环；REQ-001 下一步不变 |
 | 2026-06-22 | PM | 工作流真源同步 baseline → `agent-workflow@c8c66ce`（P8 BCR 机制） | 已完成，已 commit/push | 框架变更今后走 `BCR-###` |
@@ -62,7 +64,7 @@
 | 优先级 | 待办 | 归属角色 | 来源 | 状态 |
 |--------|------|----------|------|------|
 | P1 | REQ-001 启动 v0.1 标准迭代实现真实 L1 处理（stub→真实）；**前置 REQ-002 架构结论** | PM | xiaobao 提报 REQ-001 / Owner 立项 | 待启动（候 REQ-002） |
-| P1 | REQ-002 数据架构调研：读 Horizon/aggregator、答 4 岔路口、出数据架构方案 | Architect | Owner 指派 REQ-002 / 2026-06-29 ai PM 承接 | 待启动（切 Architect） |
+| P1 | REQ-002 数据架构调研：读 Horizon/aggregator、答 4 岔路口、出数据架构方案 | Architect | Owner 指派 REQ-002 / 2026-06-29 ai PM 承接 | 已完成（2026-06-29，见 ad-hoc spike） |
 
 ## Bootstrap 记录
 - 时间：2026-06-21
