@@ -1,5 +1,13 @@
 # Architect 角色日志
 
+## 2026-06-30 — v0.1 PRD R1 Review（Architect）
+- 本次角色：Architect（架构师）
+- 动作：标准迭代 PRD R1 Review
+- 涉及文档：`docs/progress/iterations/v0.1-prd.md`、`docs/progress/iterations/v0.1.md`、`docs/progress/INDEX.md`；核对 coordination `contracts/news-l1.md` 与本项目 `src/agent_hub/{schemas.py,main.py,graphs/news_l1.py,config.py}`
+- 结论：未通过；需 PM 修改后进入下一轮 Review。
+- 主要问题：AC-9 / 范围边界与「本迭代不改契约」冲突；AC-6 失败时部分 output 与 `RunResponse` v1 语义冲突；AC-5 链接自抓 URL 来源和 `tool_summary.kb_search` 统计口径不清。
+- 下一步入口：PM 修改 `v0.1-prd.md`；Developer 仍需完成 R1 Review；PRD 定稿后 Architect 进入设计阶段并落条件图编排、LLM client 移植 ADR。
+
 ## 2026-06-29 — REQ-002 数据架构调研（Tech Spike）
 - 本次角色：Architect（架构师，ck）
 - 动作：技术预研（承接 REQ-002）
