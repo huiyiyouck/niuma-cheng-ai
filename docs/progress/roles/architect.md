@@ -1,5 +1,13 @@
 # Architect 角色日志
 
+## 2026-07-01 — v0.1 设计 R1 Review 收口
+- 本次角色：Architect（架构师）
+- 动作：设计阶段 Review 收口
+- 涉及文档：`docs/progress/iterations/v0.1-design.md`、`docs/progress/iterations/v0.1.md`、`docs/progress/INDEX.md`
+- 结论：PM、Developer、DevOps 三方均通过，设计 R1 定稿；项目进入实现阶段，等待 Developer 启动。
+- 遗留问题/风险：PM 的五类标签 / 中文摘要和翻译目标语言建议、Developer 的 `LLMResult` / 总 timeout budget / 测试口径提示、DevOps 的 `.env.example` / provider / Tavily / 日志脱敏检查项均为实现或部署阶段跟踪项，不阻塞设计定稿。
+- 下一步入口：Developer 根据 `v0.1-prd.md`、`v0.1-design.md`、ADR-0001、ADR-0002 启动实现。
+
 ## 2026-06-30 — v0.1 详细设计 R1（Architect）
 - 本次角色：Architect（架构师）
 - 动作：标准迭代设计阶段 R1 初版

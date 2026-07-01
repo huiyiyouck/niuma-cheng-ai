@@ -6,9 +6,9 @@
 
 - 当前迭代：v0.1（标准迭代 — REQ-001 news-l1 真实化）
 - 当前模式：标准迭代
-- 当前阶段：设计阶段 — R1 Review中，PM 已通过（附 2 建议），等待 Developer、DevOps Review（见 `iterations/v0.1.md`）
+- 当前阶段：实现阶段 — 设计 R1 已三方通过并定稿，等待 Developer 启动实现（见 `iterations/v0.1.md`）
 - 阻塞项：无
-- 下一步入口：Developer、DevOps Review `v0.1-design.md`（R1）；三方通过定稿后进入实现阶段
+- 下一步入口：Developer 根据 `v0.1-prd.md` / `v0.1-design.md` 启动实现阶段
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -21,7 +21,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
-| v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | — | 进行中 · 设计 R1 Review中（PM 已通过）|
+| v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | — | 进行中 · 设计已定稿，待实现 |
 
 ## 当前 Change Notes
 
