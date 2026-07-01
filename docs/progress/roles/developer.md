@@ -1,19 +1,21 @@
 # Developer 角色日志
 
-## 2026-07-01 — v0.1 实现阶段 R1 完成 + news-l1 联调跨项目协作
-- 本次角色：Developer
-- 动作：产出（实现 S1~S4）+ 跨项目协作（沟通/提报）
+## 2026-07-01 — v0.1 实现 R1（S1~S5）+ ai 测试环境部署 + news-l1 联调回填
+- 本次角色：Developer（实现）+ DevOps（部署，另见 devops 日志）
+- 动作：产出（实现 S1~S5）+ 部署（测试环境）+ 跨项目协作（提报 + 回填）
 - 涉及文档：ai `src/agent_hub/{tasks,main,config}.py`、`graphs/news_l1.py`、`llm/{client,json,prompts}.py`、`tools/{base,link_reader,web_search,kb}.py`、`tests/*`、`docs/progress/iterations/v0.1.md`、`v0.1-test-report.md`、`INDEX.md`；coordination `communications/REQ-001-news-l1.md`、`STATUS.md`
 - 结论：
   1. v0.1 实现阶段 R1 四片完成（S1 骨架真实化 / S2 LLM client fallback / S3 工具真实化 / S4 收尾），pytest 36 passed，自测报告 `v0.1-test-report.md`；实现阶段 R1 置「Review中」待 Architect/DevOps 复核。base `2605c07` → head `0863c6a`。
   2. 跨项目：ai `/v1/runs/news-l1` 就绪后向 xiaobao 提 news-l1 **联调触发入口**诉求（coordination commit `8eecdde` 已 push；两入口只差新闻来源、不改 v1 契约）。
   3. xiaobao 已响应（见 communications/REQ-001 2026-07-01 条）：实现前端 `/debug/ai` 联调验收页 + 后端 `POST /v1/ai-debug/news-l1-runs`、`GET /v1/ai-debug/candidates`、`POST /v1/kb-search`（KB search v1，新增 `contracts/kb-search.md`），补齐 `contracts/news-l1.md` 字段语义；向 ai 提 5 点对接需求。
+  4. **S5（CN-002，Owner 2026-07-01 批准）KB 主动检索纳入 v0.1**：`tools/kb.py` 真实调 xiaobao `/v1/kb-search` + graph 主动 KB 路由（优先级 kb>link>web），pytest **40 passed**；实现 R1 head→`344ad49`（已 push）。
+  5. **部署（DevOps 职责）**：ai 服务起测试环境 `127.0.0.1:8100` 常驻（uvicorn，LLM=openclaw 火山 `doubao-seed-2.0-pro`），`/health` 200，真实 news-l1 `succeeded`（run `run_bcf24393b947`，四维评分/标签/摘要真实产出，Tavily 通、KB 降级）；回填 coordination（ai 就绪 + 回应 xiaobao 5 点，`97ae5e0`），ai 仓已 push（`123ad4e`）。
 - 关联迭代：v0.1
 - 关联非迭代工作：news-l1 跨项目联调（REQ-001）
-- 关联 Change Note：CN-001
-- 遗留问题/风险：ai 侧联调待办（未启动，见 INDEX 跨任务待办）——① 部署 ai 测试环境并提供 `AI_HUB_BASE_URL`（`/health` 200）② 鉴权 token 约定（`AI_HUB_API_TOKEN`/Bearer）③ 核对 `/v1/runs/news-l1` 与更新后 `contracts/news-l1.md` 一致 ④ 新接入 xiaobao `POST /v1/kb-search`（`x-admin-token`）——**注意 v0.1 `tools/kb.py` 为占位禁用，主动 KB 接入属新工作，是否纳入 v0.1 由 PM/Owner 定** ⑤ 联调回填真实调用证据。另：实现阶段 R1 仍待 Architect/DevOps 复核；ai 仓 8 个 commit 未推送。
-- 下一步入口：Architect/DevOps 复核实现 R1；Owner/PM 决策 ai 测试环境部署 + KB 接入的落地归属。
-- 收尾状态：未收尾
+- 关联 Change Note：CN-001、CN-002（KB 纳入 v0.1）
+- 遗留问题/风险：① KB 端到端待 xiaobao 起 `8001` + 确认是否需 `x-admin-token`（ai 侧 `KB_ADMIN_TOKEN` 留空）② 服务为 `nohup` 后台起，会话/机器重启不自动拉起，长期常驻需 systemd/supervisor ③ 实现阶段 R1（含 S5）仍待 Architect/DevOps 复核 ④ 单条约 104s 偏长（reasoning 模型+工具串行）待观察/调模型 ⑤ 鉴权测试环境不启用（Owner 定），上线前再加。
+- 下一步入口：xiaobao 配 `AI_HUB_BASE_URL=http://127.0.0.1:8100` + 起 `8001` → `/debug/ai` 端到端验收；Architect/DevOps 复核实现 R1。
+- 收尾状态：已收尾
 
 ## 2026-07-01 — v0.1 设计 R1 Review
 - 本次角色：Developer
