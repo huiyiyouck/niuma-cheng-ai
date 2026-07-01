@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from agent_hub.llm.client import LLMResult, get_ai_client
 from agent_hub.main import app
 from agent_hub.tasks import UnknownTaskError, get_task, run_task
+from agent_hub.tools.base import ToolResult, get_news_tools
 
 
 def make_parsed(**over):
@@ -54,8 +55,24 @@ class FakeClient:
         return LLMResult(provider_name=self._provider, parsed=self._parsed, raw="{}")
 
 
-def make_client(fake):
+class NullTools:
+    """默认禁用工具：隔离 S1/S2 用例，不受环境变量 / 网络影响。"""
+
+    tavily_configured = False
+
+    def extract_url(self, raw_content):
+        return None
+
+    def read_url(self, url, timeout_ms):
+        return ToolResult(ok=False, error="disabled")
+
+    def search_web(self, query, max_results, timeout_ms):
+        return ToolResult(ok=False, error="disabled")
+
+
+def make_client(fake, tools=None):
     app.dependency_overrides[get_ai_client] = lambda: fake
+    app.dependency_overrides[get_news_tools] = lambda: tools or NullTools()
     return TestClient(app)
 
 
@@ -174,6 +191,7 @@ def test_run_task_dispatch_succeeded():
         "run_test",
         L1Input(**_payload()),
         client=FakeClient(),
+        tools=NullTools(),
     )
     assert result.output is not None
     assert result.error is None

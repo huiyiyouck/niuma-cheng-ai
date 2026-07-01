@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from agent_hub.graphs.news_l1 import init_news_l1_state, news_l1_graph
 from agent_hub.llm.client import AIClient
 from agent_hub.schemas import L1Input, L1Output, ToolSummary
+from agent_hub.tools.base import DefaultNewsTools, NewsTools
 
 
 @dataclass
@@ -52,10 +53,14 @@ def get_task(task_type: str) -> TaskSpec:
 
 
 def run_task(
-    task_type: str, run_id: str, inp: BaseModel, client: AIClient
+    task_type: str,
+    run_id: str,
+    inp: BaseModel,
+    client: AIClient,
+    tools: NewsTools | None = None,
 ) -> TaskRunResult:
     spec = get_task(task_type)
-    state = spec.init_state(run_id, inp, client)
+    state = spec.init_state(run_id, inp, client, tools or DefaultNewsTools())
     final = spec.graph.invoke(state)
     output = final.get("output")
     return TaskRunResult(

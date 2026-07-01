@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI
 from agent_hub.llm.client import AIClient, get_ai_client
 from agent_hub.schemas import L1Input, RunResponse, ToolSummary
 from agent_hub.tasks import run_task
+from agent_hub.tools.base import NewsTools, get_news_tools
 
 app = FastAPI(title="niuma-cheng-ai", version="0.1.0")
 
@@ -23,12 +24,14 @@ def health() -> dict:
 
 @app.post("/v1/runs/news-l1", response_model=RunResponse)
 def run_news_l1(
-    inp: L1Input, client: AIClient = Depends(get_ai_client)
+    inp: L1Input,
+    client: AIClient = Depends(get_ai_client),
+    tools: NewsTools = Depends(get_news_tools),
 ) -> RunResponse:
     run_id = f"run_{uuid.uuid4().hex[:12]}"
     start = time.monotonic()
     try:
-        result = run_task("news-l1", run_id, inp, client=client)
+        result = run_task("news-l1", run_id, inp, client=client, tools=tools)
     except Exception as exc:  # noqa: BLE001 — 入口兜底，未预期异常统一转失败响应
         elapsed = int((time.monotonic() - start) * 1000)
         return RunResponse(
