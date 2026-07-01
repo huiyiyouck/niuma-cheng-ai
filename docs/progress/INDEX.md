@@ -6,9 +6,9 @@
 
 - 当前迭代：v0.1（标准迭代 — REQ-001 news-l1 真实化）
 - 当前模式：标准迭代
-- 当前阶段：实现阶段 — R1 进行中：S1/S2 已完成（`7535949`，pytest 30 passed），进行 S3 工具真实化（见 `iterations/v0.1.md` 实现进度）
+- 当前阶段：实现阶段 — R1 进行中：S1/S2/S3 已完成（`afad1aa`，pytest 36 passed），进行 S4 收尾（`.env.example` + 自测报告 + 全量回归）
 - 阻塞项：无
-- 下一步入口：Developer 继续实现阶段 S3（`tools/{link_reader,web_search,kb}` + 条件分支路由启发式）
+- 下一步入口：Developer 完成实现阶段 S4，随后整个实现阶段 R1 提交 Architect/DevOps 复核
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
