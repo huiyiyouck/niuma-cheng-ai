@@ -6,9 +6,9 @@
 
 - 当前迭代：v0.1（标准迭代 — REQ-001 news-l1 真实化）
 - 当前模式：标准迭代
-- 当前阶段：实现阶段 — R1 五片完成（S1~S5，S5=CN-002 KB 主动检索纳入 v0.1，base `2605c07`→head `344ad49`，pytest 40 passed），代码待 Architect/DevOps 复核；并行进入部署就绪检查（起 ai 测试环境服务，Owner 已批 2026-07-01）
-- 阻塞项：无（部署待 Owner 填 `.env` 真 key/token）
-- 下一步入口：DevOps 起 ai 服务到测试环境（127.0.0.1:8100）+ news-l1/KB 真实冒烟回填 D-1；Architect/DevOps 复核实现 R1
+- 当前阶段：实现阶段 R1 五片完成（40 passed）+ **ai 服务已部署测试环境 `127.0.0.1:8100` 常驻**，news-l1 主链路真实冒烟通过（火山 LLM，run `run_bcf24393b947`）；等 xiaobao 配 `AI_HUB_BASE_URL` + 起 8001 做 KB/端到端联调
+- 阻塞项：无（KB 端到端待 xiaobao 起 8001）
+- 下一步入口：① 已回填 coordination「ai 服务就绪」→ xiaobao 配地址联调；② Architect/DevOps 复核实现 R1；③ 观察单条耗时 104s（reasoning 模型）是否调优
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
