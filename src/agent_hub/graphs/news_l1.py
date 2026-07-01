@@ -36,6 +36,8 @@ _MIN_RAW_LEN = 300
 _MIN_CTX_LEN = 500
 _LINK_TIMEOUT_MS = 8000
 _QUERY_MAX_LEN = 180
+_KB_QUERY_MAX_LEN = 60
+_KB_TOP_N = 5
 
 
 @dataclass
@@ -193,7 +195,51 @@ def web_search_node(state: L1State) -> dict:
     return updates
 
 
+def kb_search_node(state: L1State) -> dict:
+    """主动库内检索：回调 xiaobao /v1/kb-search（CN-002）。发起即计数，失败可降级。"""
+    inp = state["inp"]
+    tools = state["tools"]
+    result = tools.search_kb(
+        _build_kb_query(inp),
+        _KB_TOP_N,
+        inp.options.timeout_ms,
+        domain_tags=inp.domain_tags or None,
+    )
+
+    updates: dict = {
+        "tool_summary": _bump_tool(state["tool_summary"], "kb_search"),
+        "tool_budget_used": state["tool_budget_used"] + 1,
+    }
+    if result.ok and result.items:
+        updates["context_items"] = state["context_items"] + [
+            ContextItem(
+                source_type="kb",
+                content=item.content,
+                title=item.title,
+                url=item.url,
+                metadata={"active": True, **item.metadata},
+            )
+            for item in result.items
+        ]
+    else:
+        updates["errors"] = state["errors"] + [
+            StepError("kb_search", "kb_error", result.error or "failed", True)
+        ]
+        updates["degradations"] = state["degradations"] + ["kb_search_failed"]
+    return updates
+
+
 def route_after_ingest(state: L1State) -> str:
+    if _should_kb_search(state):
+        return "kb_search"
+    if _should_link_read(state):
+        return "link_read"
+    if _should_web_search(state):
+        return "web_search"
+    return "llm_process"
+
+
+def route_after_kb(state: L1State) -> str:
     if _should_link_read(state):
         return "link_read"
     if _should_web_search(state):
@@ -205,6 +251,17 @@ def route_after_link(state: L1State) -> str:
     if _should_web_search(state):
         return "web_search"
     return "llm_process"
+
+
+def _should_kb_search(state: L1State) -> bool:
+    inp = state["inp"]
+    prefetched = bool(inp.kb_results)
+    return (
+        state["tools"].kb_configured
+        and not prefetched
+        and _budget_ok(state)
+        and _context_insufficient(state)
+    )
 
 
 def _should_link_read(state: L1State) -> bool:
@@ -247,7 +304,7 @@ def _bump_tool(ts: ToolSummary, field_name: str) -> ToolSummary:
     return ToolSummary(
         web_search=ts.web_search + (1 if field_name == "web_search" else 0),
         link_read=ts.link_read + (1 if field_name == "link_read" else 0),
-        kb_search=ts.kb_search,
+        kb_search=ts.kb_search + (1 if field_name == "kb_search" else 0),
     )
 
 
@@ -258,6 +315,13 @@ def _build_query(inp: L1Input) -> str:
         inp.source_identity,
     ]
     return " ".join(p for p in parts if p).strip()[:_QUERY_MAX_LEN]
+
+
+def _build_kb_query(inp: L1Input) -> str:
+    """库内检索用短查询词（契约建议不传整段原文）：标题优先，回退 raw_text 片段。"""
+    title = inp.raw_content.get("title", "") if isinstance(inp.raw_content, dict) else ""
+    query = title or inp.raw_text[:_KB_QUERY_MAX_LEN]
+    return query.strip()[:_KB_QUERY_MAX_LEN]
 
 
 def llm_process_node(state: L1State) -> dict:
@@ -354,6 +418,7 @@ def _redact(exc: Exception) -> str:
 def build_news_l1_graph():
     g = StateGraph(L1State)
     g.add_node("ingest_context", ingest_context_node)
+    g.add_node("kb_search", kb_search_node)
     g.add_node("link_read", link_read_node)
     g.add_node("web_search", web_search_node)
     g.add_node("llm_process", llm_process_node)
@@ -362,6 +427,16 @@ def build_news_l1_graph():
     g.add_conditional_edges(
         "ingest_context",
         route_after_ingest,
+        {
+            "kb_search": "kb_search",
+            "link_read": "link_read",
+            "web_search": "web_search",
+            "llm_process": "llm_process",
+        },
+    )
+    g.add_conditional_edges(
+        "kb_search",
+        route_after_kb,
         {"link_read": "link_read", "web_search": "web_search", "llm_process": "llm_process"},
     )
     g.add_conditional_edges(

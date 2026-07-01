@@ -14,13 +14,18 @@ from test_news_l1 import FakeClient, _payload
 
 
 class FakeTools:
-    def __init__(self, link=None, web=None, tavily_configured=True, url=None):
+    def __init__(
+        self, link=None, web=None, kb=None, tavily_configured=True, kb_configured=False, url=None
+    ):
         self._link = link
         self._web = web
+        self._kb = kb
         self.tavily_configured = tavily_configured
+        self.kb_configured = kb_configured
         self._url = url
         self.link_calls = 0
         self.web_calls = 0
+        self.kb_calls = 0
 
     def extract_url(self, raw_content):
         return self._url or raw_content.get("url") or raw_content.get("canonical_url")
@@ -32,6 +37,10 @@ class FakeTools:
     def search_web(self, query, max_results, timeout_ms):
         self.web_calls += 1
         return self._web or ToolResult(ok=False, error="failed")
+
+    def search_kb(self, query, top_n, timeout_ms, **kw):
+        self.kb_calls += 1
+        return self._kb or ToolResult(ok=False, error="failed")
 
 
 def make_client(tools, client=None):
@@ -122,6 +131,59 @@ def test_link_fail_llm_ok_returns_succeeded_with_degradation():
     # 发起即计数
     assert body["tool_summary"]["link_read"] == 1
     assert "degraded:link_read_failed" in body["output"]["tags"]["processing"]
+
+
+# --- 测试（CN-002 / S5）：KB 主动检索 ---
+def test_kb_search_triggered_first_when_configured():
+    tools = FakeTools(
+        kb=ToolResult(ok=True, items=[ToolResultItem(content="库内背景" * 200, title="bg")]),
+        kb_configured=True,
+        tavily_configured=True,
+        url="https://x/a",
+    )
+    c = make_client(tools)
+    body = c.post(
+        "/v1/runs/news-l1",
+        json=_payload(raw_text=_SHORT, raw_content={"url": "https://x/a"}),
+    ).json()
+    assert body["status"] == "succeeded"
+    assert body["tool_summary"]["kb_search"] == 1
+    assert tools.kb_calls == 1
+    # KB 补足上下文后 link/web 跳过
+    assert body["tool_summary"]["link_read"] == 0
+    assert body["tool_summary"]["web_search"] == 0
+
+
+def test_kb_not_triggered_when_prefetched():
+    tools = FakeTools(kb_configured=True)
+    c = make_client(tools)
+    body = c.post(
+        "/v1/runs/news-l1",
+        json=_payload(raw_text=_SHORT, kb_results=[{"title": "a", "summary": "b"}]),
+    ).json()
+    assert body["tool_summary"]["kb_search"] == 0
+    assert tools.kb_calls == 0
+
+
+def test_kb_not_triggered_when_unconfigured():
+    tools = FakeTools(kb_configured=False)
+    c = make_client(tools)
+    body = c.post("/v1/runs/news-l1", json=_payload(raw_text=_SHORT)).json()
+    assert body["tool_summary"]["kb_search"] == 0
+    assert tools.kb_calls == 0
+
+
+def test_kb_fail_degraded_but_succeeded():
+    tools = FakeTools(
+        kb=ToolResult(ok=False, error="http_500"),
+        kb_configured=True,
+        tavily_configured=False,
+    )
+    c = make_client(tools)
+    body = c.post("/v1/runs/news-l1", json=_payload(raw_text=_SHORT)).json()
+    assert body["status"] == "succeeded"
+    assert body["tool_summary"]["kb_search"] == 1  # 发起即计数
+    assert "degraded:kb_search_failed" in body["output"]["tags"]["processing"]
 
 
 # --- 上下文充分时不触发任何工具 ---

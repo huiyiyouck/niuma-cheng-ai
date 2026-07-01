@@ -10,6 +10,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from agent_hub.tools.kb import kb_configured, search_kb
 from agent_hub.tools.link_reader import extract_url, read_url
 from agent_hub.tools.web_search import search_web
 
@@ -31,17 +32,20 @@ class ToolResult:
 
 class NewsTools(Protocol):
     tavily_configured: bool
+    kb_configured: bool
 
     def extract_url(self, raw_content: dict) -> str | None: ...
     def read_url(self, url: str, timeout_ms: int) -> ToolResult: ...
     def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult: ...
+    def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult: ...
 
 
 class DefaultNewsTools:
-    """真实工具组合：link 自抓 + Tavily 搜索。KB 实时检索占位、默认禁用。"""
+    """真实工具组合：link 自抓 + Tavily 搜索 + xiaobao 库内检索（CN-002）。"""
 
     def __init__(self):
         self.tavily_configured = bool(os.getenv("TAVILY_API_KEY"))
+        self.kb_configured = kb_configured()
 
     def extract_url(self, raw_content: dict) -> str | None:
         return extract_url(raw_content)
@@ -51,6 +55,9 @@ class DefaultNewsTools:
 
     def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult:
         return search_web(query, max_results, timeout_ms)
+
+    def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult:
+        return search_kb(query, top_n, timeout_ms, **kw)
 
 
 def get_news_tools() -> NewsTools:

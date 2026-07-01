@@ -59,6 +59,7 @@ class NullTools:
     """默认禁用工具：隔离 S1/S2 用例，不受环境变量 / 网络影响。"""
 
     tavily_configured = False
+    kb_configured = False
 
     def extract_url(self, raw_content):
         return None
@@ -67,6 +68,9 @@ class NullTools:
         return ToolResult(ok=False, error="disabled")
 
     def search_web(self, query, max_results, timeout_ms):
+        return ToolResult(ok=False, error="disabled")
+
+    def search_kb(self, query, top_n, timeout_ms, **kw):
         return ToolResult(ok=False, error="disabled")
 
 
