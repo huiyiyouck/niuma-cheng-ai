@@ -177,3 +177,43 @@ def test_run_task_dispatch_succeeded():
     )
     assert result.output is not None
     assert result.error is None
+
+
+# --- 测试 9（S2）：越界 score 被 normalize 到 0-5 ---
+def test_out_of_range_scores_clamped():
+    parsed = make_parsed(
+        scores={
+            "timeliness": {"score": 9, "reason": "过高"},
+            "impact": {"score": -2, "reason": "过低"},
+            "confidence": {"score": 3, "reason": "正常"},
+            "clarity": {"score": 5, "reason": "上界"},
+        }
+    )
+    c = make_client(FakeClient(parsed=parsed))
+    dims = c.post("/v1/runs/news-l1", json=_payload()).json()["output"]["score_dimensions"]
+    assert dims["timeliness"]["score"] == 5
+    assert dims["impact"]["score"] == 0
+    assert dims["confidence"]["score"] == 3
+    assert dims["clarity"]["score"] == 5
+
+
+# --- 测试 10（S2）：context URL 只保留证据中真实出现的来源 ---
+def test_context_url_filtered_to_evidence():
+    parsed = make_parsed(
+        context=[
+            {"url": "https://real.example/a", "title": "真实来源"},
+            {"url": "https://hallucinated.example/x", "title": "编造来源"},
+        ]
+    )
+    # 预取 link 提供真实证据 URL（来自 raw_content.url）
+    c = make_client(FakeClient(parsed=parsed))
+    body = c.post(
+        "/v1/runs/news-l1",
+        json=_payload(
+            raw_content={"url": "https://real.example/a"},
+            link_content="真实来源正文",
+        ),
+    ).json()
+    urls = [item.get("url") for item in body["output"]["context"]]
+    assert "https://real.example/a" in urls
+    assert "https://hallucinated.example/x" not in urls

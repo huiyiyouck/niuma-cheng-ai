@@ -150,9 +150,17 @@ def normalize_output_node(state: L1State) -> dict:
     def dim(name: str) -> ScoreDimension:
         d = scores.get(name) or {}
         return ScoreDimension(
-            score=int(d.get("score", 0)),
+            score=_clamp_score(d.get("score", 0)),
             reason=str(d.get("reason", "")),
         )
+
+    # context 引用校验：只保留证据（预取 / 工具结果）中真实出现的 URL，过滤 LLM 编造
+    evidence_urls = {ci.url for ci in state["context_items"] if ci.url}
+    context = [
+        item
+        for item in (parsed.get("context") or [])
+        if isinstance(item, dict) and item.get("url") in evidence_urls
+    ]
 
     raw_tags = parsed.get("tags") or {}
     processing = [_ENGINE_TAG, f"llm:{result.provider_name}"]
@@ -163,7 +171,7 @@ def normalize_output_node(state: L1State) -> dict:
         title=str(parsed.get("title") or state["inp"].raw_text[:40]),
         summary=str(parsed.get("summary") or ""),
         translation=parsed.get("translation") or {},
-        context=[],  # 引用校验（只保留工具结果 URL）留 S2/S3
+        context=context,
         analysis=parsed.get("analysis"),
         score_dimensions=ScoreDimensions(
             timeliness=dim("timeliness"),
@@ -181,6 +189,14 @@ def normalize_output_node(state: L1State) -> dict:
         needs_context=bool(parsed.get("needs_context", state["needs_context"])),
     )
     return {"output": output, "needs_context": output.needs_context}
+
+
+def _clamp_score(value) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, min(5, n))
 
 
 def _extract_url(raw_content: dict) -> Optional[str]:

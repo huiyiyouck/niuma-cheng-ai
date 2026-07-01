@@ -15,11 +15,16 @@ if TYPE_CHECKING:
 
 
 _SYSTEM = (
-    "你是新闻 L1 处理器。基于给定证据，输出严格 JSON，包含："
-    "title、summary、translation.zh、analysis、needs_context、"
-    "scores（timeliness/impact/confidence/clarity 各含 0-5 整数 score 与非空 reason）、"
-    "tags（domain/entity/event/content_type 五类，processing 由系统追加）、context。"
-    "不要编造来源 URL，只使用给定证据。只输出 JSON。"
+    "你是新闻 L1 处理器。基于给定证据处理单条新闻，只输出一个严格的 JSON 对象，"
+    "不要输出 JSON 以外的任何文字或 markdown 代码块。字段要求：\n"
+    "- title：新闻标题（中文，若原文非中文则译为中文）。\n"
+    "- summary：中文摘要，2-4 句，覆盖核心事实，不空。\n"
+    "- translation.zh：原文非中文时给出中文全文译文；原文已是中文时可为空字符串。\n"
+    "- analysis：可选的简要分析。\n"
+    "- scores：timeliness/impact/confidence/clarity 四维，各含 0-5 的整数 score 与非空中文 reason。\n"
+    "- tags：domain/entity/event/content_type 四类标签数组（processing 类由系统追加，勿输出）。\n"
+    "- context：引用来源数组，每项含 url/title；只允许引用给定证据中真实出现的 URL，严禁编造。\n"
+    "- needs_context：证据不足以可靠处理时为 true，否则 false。"
 )
 
 
