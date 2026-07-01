@@ -1,5 +1,20 @@
 # Developer 角色日志
 
+## 2026-07-01 — v0.1 实现阶段 R1 完成 + news-l1 联调跨项目协作
+- 本次角色：Developer
+- 动作：产出（实现 S1~S4）+ 跨项目协作（沟通/提报）
+- 涉及文档：ai `src/agent_hub/{tasks,main,config}.py`、`graphs/news_l1.py`、`llm/{client,json,prompts}.py`、`tools/{base,link_reader,web_search,kb}.py`、`tests/*`、`docs/progress/iterations/v0.1.md`、`v0.1-test-report.md`、`INDEX.md`；coordination `communications/REQ-001-news-l1.md`、`STATUS.md`
+- 结论：
+  1. v0.1 实现阶段 R1 四片完成（S1 骨架真实化 / S2 LLM client fallback / S3 工具真实化 / S4 收尾），pytest 36 passed，自测报告 `v0.1-test-report.md`；实现阶段 R1 置「Review中」待 Architect/DevOps 复核。base `2605c07` → head `0863c6a`。
+  2. 跨项目：ai `/v1/runs/news-l1` 就绪后向 xiaobao 提 news-l1 **联调触发入口**诉求（coordination commit `8eecdde` 已 push；两入口只差新闻来源、不改 v1 契约）。
+  3. xiaobao 已响应（见 communications/REQ-001 2026-07-01 条）：实现前端 `/debug/ai` 联调验收页 + 后端 `POST /v1/ai-debug/news-l1-runs`、`GET /v1/ai-debug/candidates`、`POST /v1/kb-search`（KB search v1，新增 `contracts/kb-search.md`），补齐 `contracts/news-l1.md` 字段语义；向 ai 提 5 点对接需求。
+- 关联迭代：v0.1
+- 关联非迭代工作：news-l1 跨项目联调（REQ-001）
+- 关联 Change Note：CN-001
+- 遗留问题/风险：ai 侧联调待办（未启动，见 INDEX 跨任务待办）——① 部署 ai 测试环境并提供 `AI_HUB_BASE_URL`（`/health` 200）② 鉴权 token 约定（`AI_HUB_API_TOKEN`/Bearer）③ 核对 `/v1/runs/news-l1` 与更新后 `contracts/news-l1.md` 一致 ④ 新接入 xiaobao `POST /v1/kb-search`（`x-admin-token`）——**注意 v0.1 `tools/kb.py` 为占位禁用，主动 KB 接入属新工作，是否纳入 v0.1 由 PM/Owner 定** ⑤ 联调回填真实调用证据。另：实现阶段 R1 仍待 Architect/DevOps 复核；ai 仓 8 个 commit 未推送。
+- 下一步入口：Architect/DevOps 复核实现 R1；Owner/PM 决策 ai 测试环境部署 + KB 接入的落地归属。
+- 收尾状态：未收尾
+
 ## 2026-07-01 — v0.1 设计 R1 Review
 - 本次角色：Developer
 - 动作：Review
