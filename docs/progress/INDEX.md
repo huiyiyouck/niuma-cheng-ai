@@ -6,9 +6,9 @@
 
 - 当前迭代：v0.1（标准迭代 — REQ-001 news-l1 真实化）
 - 当前模式：标准迭代
-- 当前阶段：实现阶段 — R1 进行中：S1/S2/S3 已完成（`afad1aa`，pytest 36 passed），进行 S4 收尾（`.env.example` + 自测报告 + 全量回归）
+- 当前阶段：实现阶段 — R1 已提交 Review（S1~S4 四片完成，base `2605c07`→head `0863c6a`，pytest 36 passed，自测报告 `v0.1-test-report.md`），等待 Architect / DevOps 复核
 - 阻塞项：无
-- 下一步入口：Developer 完成实现阶段 S4，随后整个实现阶段 R1 提交 Architect/DevOps 复核
+- 下一步入口：Architect、DevOps 复核实现阶段 R1（验收/边界/回归 + 部署配置）；通过后进部署就绪检查
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -21,7 +21,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
-| v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | — | 进行中 · 设计已定稿，待实现 |
+| v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | — | 进行中 · 实现 R1 待 Review（[自测报告](iterations/v0.1-test-report.md)） |
 
 ## 当前 Change Notes
 
