@@ -6,9 +6,9 @@
 
 - 当前迭代：v0.1（标准迭代 — REQ-001 news-l1 真实化）
 - 当前模式：标准迭代
-- 当前阶段：实现阶段 — R1 已提交 Review（S1~S4 四片完成，base `2605c07`→head `0863c6a`，pytest 36 passed，自测报告 `v0.1-test-report.md`），等待 Architect / DevOps 复核
-- 阻塞项：无
-- 下一步入口：Architect、DevOps 复核实现阶段 R1（验收/边界/回归 + 部署配置）；通过后进部署就绪检查
+- 当前阶段：实现阶段 — R1 五片完成（S1~S5，S5=CN-002 KB 主动检索纳入 v0.1，base `2605c07`→head `344ad49`，pytest 40 passed），代码待 Architect/DevOps 复核；并行进入部署就绪检查（起 ai 测试环境服务，Owner 已批 2026-07-01）
+- 阻塞项：无（部署待 Owner 填 `.env` 真 key/token）
+- 下一步入口：DevOps 起 ai 服务到测试环境（127.0.0.1:8100）+ news-l1/KB 真实冒烟回填 D-1；Architect/DevOps 复核实现 R1
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
