@@ -6,9 +6,9 @@
 
 - 当前迭代：v0.1（标准迭代 — REQ-001 news-l1 真实化）
 - 当前模式：标准迭代
-- 当前阶段：实现阶段 R1 五片完成（40 passed）+ **ai 服务已部署测试环境 `127.0.0.1:8100` 常驻**，news-l1 主链路真实冒烟通过（火山 LLM，run `run_bcf24393b947`）；等 xiaobao 配 `AI_HUB_BASE_URL` + 起 8001 做 KB/端到端联调
-- 阻塞项：无（KB 端到端待 xiaobao 起 8001）
-- 下一步入口：① 已回填 coordination「ai 服务就绪」→ xiaobao 配地址联调；② Architect/DevOps 复核实现 R1；③ 观察单条耗时 104s（reasoning 模型）是否调优
+- 当前阶段：实现阶段 R1 五片完成（40 passed）+ **ai 服务已部署测试环境 `127.0.0.1:8100` 常驻**，news-l1 主链路真实冒烟通过（火山 LLM，run `run_bcf24393b947`）；2026-07-02 复核 `8100` / `8001` 均在本机监听，待 xiaobao 配置确认与 KB/端到端联调证据
+- 阻塞项：无（KB/端到端待 xiaobao 配置确认与联调证据；`8001` 当前已监听）
+- 下一步入口：① xiaobao 确认 `AI_HUB_BASE_URL` / `KB_ADMIN_TOKEN` 后跑端到端联调；② Architect/DevOps 复核实现 R1；③ 观察单条耗时 104s（reasoning 模型）是否调优
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -42,6 +42,7 @@
 
 | 日期 | 角色 | 工作 | 结论 | 下一步入口 |
 |------|------|------|------|------------|
+| 2026-07-02 | DevOps | 同步最新 + 收尾复核：`git pull --rebase` 已是最新；`127.0.0.1:8100` `/health` 200；`127.0.0.1:8001` 当前监听 | 暂停待续（迭代未关闭） | xiaobao 确认配置后做 KB/端到端联调；Architect/DevOps 复核实现 R1 |
 | 2026-07-01 | Developer+DevOps | v0.1 实现 R1（S1~S5，含 CN-002 KB 接入，40 passed）+ ai 服务部署测试环境 `127.0.0.1:8100`（火山 LLM，news-l1 真实冒烟 succeeded）+ 回填 coordination | 暂停待续（迭代未关闭） | xiaobao 配 `AI_HUB_BASE_URL`+起 8001 端到端联调；Architect/DevOps 复核实现 R1 |
 | 2026-06-29 | Architect | REQ-002 数据架构调研：4 岔路口已答 + 生态骨架接缝（见 `ad-hoc/2026-06-29-spike-req002-data-architecture.md`） | 已完成（待 Owner/PM Review） | PM 创建 `v0.1-prd.md`；coordination REQ-002 回执待跟进 |
 | 2026-06-29 | PM | ai 产品定位升级生态内部通用 AI 中枢 + REQ-002 承接 + 元信息台账（coordination push `7fa7820`） | 已完成 | 切 Architect 做数据架构定位（REQ-002）→ PM 创建 v0.1 PRD |
