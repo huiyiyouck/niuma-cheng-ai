@@ -44,7 +44,7 @@ curl localhost:8100/health
 - 调用方 `xiaobao`（牛马成新闻平台，Node.js）：通过 `POST /v1/runs/news-l1` 调用本服务；其 `tasks` 为业务真源，本服务 run 仅为处理证据。
 - 外部 LLM API（OpenAI 兼容）：L1 推理引擎。
 - 外部 Web 搜索：按需工具调用。
-- `coordination_root`：`/root/Project/niuma-cheng-coordination`（本地 checkout，跨项目契约 / 状态单一真源；跨项目任务据此定位，见 `cross-project-collaboration.md`）。
+- `coordination_root`：`../niuma-cheng-coordination`（相对项目根的本地 checkout，跨项目契约 / 状态单一真源；跨项目任务据此定位，见 `cross-project-collaboration.md`）。
 
 ## 业务边界
 - 本项目做：L1 新闻 LLM 处理 —— 四维 `score` + `reason`、标签、摘要、翻译，以及按需工具调用（KB 检索 / 链接读取 / Web 搜索）。
