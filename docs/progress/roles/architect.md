@@ -1,5 +1,15 @@
 # Architect 角色日志
 
+## 2026-07-04 — v0.1 实现 R1 Review（Architect）
+- 本次角色：Architect（架构师）
+- 动作：标准迭代实现阶段 R1 Review
+- 涉及文档：`docs/progress/iterations/v0.1-test-report.md`（追加 Review 记录）、`docs/progress/iterations/v0.1.md`（更新实现阶段 R1 Review 结果与阶段状态）、`docs/progress/INDEX.md`（更新当前阶段与下一步入口）；核对 `v0.1-design.md`、`v0.1-prd.md`、ADR-0001/0002、`src/agent_hub/{schemas,main,tasks,config,graphs/news_l1,llm/client,llm/prompts,llm/json,tools/kb,tools/base,tools/link_reader,tools/web_search}.py`、`tests/`、`.env.example`
+- 结论：**通过**（实现忠实设计 ADR-0001/0002 与 PRD AC-1~9，对外契约不变；附 5 条非阻塞观察项）
+- 核对要点：对外契约不变（`schemas`/`main` 仅 `/health` + `POST /v1/runs/news-l1`，failed+output=null 对齐 v1）；内部 registry（AC-9）落地且不暴露通用路由；条件图编排 kb>link>web 优先级忠实 ADR-0001；`ChainedAIClient` fallback 矩阵完整 + 显式总 timeout budget；降级语义对齐 AC-6；输出清洗 score clamp / context URL 过滤 / `processing` 标签到位；prompt 五类标签 + 中文摘要 + `translation.zh`；测试 40 passed 覆盖设计 §8 全 10 项；`.env.example` 补全
+- 非阻塞观察项：① 设计文档未同步 CN-002 KB 主动路由（§4.3/§4.6/风险表仍写占位禁用）② `normalize_output` 兜底未完全实现 §4.7（缺失 reason / 空 summary 填空字符串而非降级说明）③ `kb_search_node` 未传 `exclude_raw_item_id`（可能自检索，需确认 kb-search v1 契约）④ `config.py` 的 `Config` 类与 `config` 实例为死代码 ⑤ `_http_call_provider` 400 非 quirk 错误 kind 标记为 `server_error`/`provider_5xx` 语义不准
+- 遗留问题/风险：D-1 真实外部连通性（LLM/link/Tavily/KB）未在单测覆盖，待 DevOps 部署冒烟验证；单条约 104s 偏长待观察
+- 下一步入口：DevOps Review 实现 R1（provider/Tavily/KB 配置 + 部署冒烟检查项 + D-1 真实连通性）；两方通过后实现 R1 定稿进 Owner 验收；非阻塞观察项 1/2 建议实现 R2 或下一迭代处理，3/4/5 视优先级安排
+
 ## 2026-07-01 — v0.1 设计 R1 Review 收口
 - 本次角色：Architect（架构师）
 - 动作：设计阶段 Review 收口

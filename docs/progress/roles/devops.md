@@ -1,5 +1,18 @@
 # DevOps 角色日志
 
+## 2026-07-04 — 实现 R1 DevOps Review
+
+- 本次角色：DevOps
+- 动作：Review（实现 R1 部署 / 环境变量 / 密钥注入 / 健康检查 / 发布风险 / 回滚条件）
+- 涉及文档：`docs/progress/iterations/v0.1.md`、`docs/progress/iterations/v0.1-test-report.md`、`docs/progress/iterations/v0.1-design.md`；实读 `.env.example` / `src/agent_hub/{config,main}.py` / `src/agent_hub/llm/client.py` / `src/agent_hub/tools/{web_search,kb,link_reader}.py` / `requirements.txt`；运行实查 `curl 8100/health`、`lsof 8100/8001`、`ps uvicorn`
+- 结论：**通过**（实现 R1 从 DevOps 视角可定稿；附 4 条发布检查项跟踪到部署阶段，不阻塞）。设计 DevOps R1 三条发布检查项落实：`.env.example` 已补全 ✅、生产 ≥2 provider ⏳、健康检查 / 发布冒烟 🟡（2026-07-01 真实冒烟 succeeded + Tavily 通，多 provider 真实 fallback 未冒烟）。密钥注入边界、总 timeout budget、provider fallback 矩阵、Tavily/KB 未配置降级均与设计一致。两方通过，实现 R1 定稿，进入 Owner 验收 / 部署就绪检查。
+- 关联迭代：v0.1（实现阶段 R1 定稿）
+- 关联非迭代工作：无
+- 关联 Change Note：CN-002
+- 遗留问题/风险：① 当前服务实际未运行（`8100` / `8001` 无监听、`nohup` 非托管、重启不自动拉起）→ 部署阶段补 systemd/supervisor/launchd 托管 ② 日志可观测性缺失（`main.py`/`llm/client.py`/`tools/*` 均无 `logging`）→ 部署阶段补结构化脱敏 logging ③ 生产 ≥2 provider 未验证 ④ 单条 ~104s 偏长（reasoning 模型 + 工具串行）⑤ Architect 5 条非阻塞观察项按优先级在 R2 或下一迭代处理。
+- 下一步入口：Owner 验收 / 部署就绪检查（处理 4 条发布检查项）；Architect 同步 test-report 状态表 Architect 行；Developer 同步 test-report 结论段「36 passed」→「40 passed」。
+- 收尾状态：已收尾
+
 ## 2026-07-02 — 同步最新 + 收尾复核
 - 本次角色：DevOps
 - 动作：同步 / 收尾 / 运行状态复核
