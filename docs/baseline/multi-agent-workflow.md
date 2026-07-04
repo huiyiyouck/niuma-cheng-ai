@@ -277,7 +277,7 @@ docs/progress/roles/{role}-corrections.md
 [基线修正提案] 问题：...；建议：...  → 转写为 coordination BCR-###（问题 + 拟改文件 + 理由）
 ```
 
-`baseline/` 是工作流框架，由真源仓库统一维护。本项目内任何角色都不直接改 `baseline/`，只提 `BCR-###`，由 Owner + 真源会话评估、落地，再经 `sync-downstream.sh` 回流。
+`baseline/` 是工作流框架，由真源仓库统一维护。本项目内任何角色都不直接改 `baseline/`，只提 `BCR-###`，由 Owner + 参谋长评估、落地，再经 `sync-downstream.sh` 回流。
 
 ## 15. 角色创建机制
 
