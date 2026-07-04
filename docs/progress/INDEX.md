@@ -4,11 +4,11 @@
 
 ## 当前项目状态
 
-- 当前迭代：v0.1（标准迭代 — REQ-001 news-l1 真实化）
-- 当前模式：标准迭代
-- 当前阶段：实现 R1 **已定稿**（Architect + DevOps 两方通过，2026-07-04）；跨项目端到端联调完成（2026-07-04，4 条用例通过，Owner 抽样验收通过，见 coordination `communications/REQ-001-news-l1.md`）；进入迭代关闭检查（待 Owner 同步验收状态）。
-- 阻塞项：无（联调已通过；4 条发布检查项 + Architect 5 条观察项 + D-2/D-3 均不阻塞关闭，跟踪到部署阶段 / R2 / 下一迭代）
-- 下一步入口：① **Owner 确认验收状态**（coordination 2026-07-04 记抽样验收通过，本仓 INDEX 旧记「未验收」需 Owner 同步）并触发迭代关闭检查机制；② 部署阶段处理 4 条发布检查项（DevOps：托管化 / 多 provider；Developer 代码侧：logging / 耗时）；③ R2 或下一迭代处理 Architect 5 条非阻塞观察项 + D-2（上下文充分性阈值）+ D-3（KB 空结果语义）；④ Architect 同步 `v0.1-test-report.md` Review 状态表 Architect 行（仍标「待Review」）
+- 当前迭代：v0.1（已关闭，2026-07-04）
+- 当前模式：标准迭代（已关闭）
+- 当前阶段：v0.1 **已关闭**—— PRD R2 定稿 + 设计 R1 定稿 + 实现 R1 两方 Review 通过 + 自测 40 passed + 部署就绪检查通过 + 端到端联调 4 条用例通过 + Owner 验收通过 + 迭代关闭检查通过
+- 阻塞项：无
+- 下一步入口：① v0.2 立项（PM，待 Owner 确定范围：4 条发布检查项 + Architect 5 条观察项 + D-2/D-3 + KB 空结果语义）；② 部署阶段 DevOps 托管化 + 生产多 provider 验证；③ coordination REQ-001 已关闭同步
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -21,9 +21,11 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
-| v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | — | 进行中 · 实现 R1 已定稿 + 端到端联调通过（待 Owner 同步验收触发关闭，[自测报告](iterations/v0.1-test-report.md)） |
+| v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | [v0.1-summary.md](iterations/v0.1-summary.md) | 已关闭（2026-07-04，[自测报告](iterations/v0.1-test-report.md)） |
 
 ## 当前 Change Notes
+
+> v0.1 迭代已关闭，CN-001 / CN-002 已随 v0.1 归档。
 
 | Change Note | 关联工作 | 状态 | 下一步 |
 |-------------|----------|------|--------|
@@ -42,6 +44,7 @@
 
 | 日期 | 角色 | 工作 | 结论 | 下一步入口 |
 |------|------|------|------|------------|
+| 2026-07-04 | PM | 迭代关闭检查 + 收尾归档：修 test-report 小问题（Architect 状态表 / 36→40 passed）、v0.1 部署就绪 + 关闭归档区、CN-001/CN-002 归档、生成 v0.1-summary.md、更新 INDEX、更新 PM 日志、coordination REQ-001 置已关闭 | v0.1 已关闭 | v0.2 立项（PM，待 Owner 确定范围）；部署阶段 DevOps 托管化 + 多 provider |
 | 2026-07-04 | Developer | 收尾铺写：同步 test-report 元信息（40 passed / 文档定稿 / D-1 闭环 / D-3 登记）、v0.1.md 部署就绪检查与迭代关闭归档、INDEX.md 状态、Developer 日志；核实 coordination 联调文档完整（2026-07-04 端到端 4 条用例通过，Owner 抽样验收通过）；区分 Developer 代码侧（logging/耗时）vs DevOps 运维侧（托管化/多 provider）发布检查项归属 | 已收尾（Developer 侧铺写完成） | Owner 同步验收状态并触发迭代关闭检查；R2/下一迭代处理发布检查项 + Architect 观察项 + D-2/D-3 |
 | 2026-07-04 | DevOps | 实现 R1 Review（部署 / 环境变量 / 密钥注入 / 健康检查 / 发布风险 / 回滚条件）：两方通过，实现 R1 定稿；4 条发布检查项跟踪到部署阶段 | 已收尾（实现 R1 定稿） | Owner 验收；部署就绪检查处理 4 条发布检查项 |
 | 2026-07-02 | DevOps | 同步最新 + 收尾复核：`git pull --rebase` 已是最新；`127.0.0.1:8100` `/health` 200；`127.0.0.1:8001` 当前监听 | 暂停待续（迭代未关闭） | xiaobao 确认配置后做 KB/端到端联调；Architect/DevOps 复核实现 R1 |
@@ -68,9 +71,9 @@
 
 | 优先级 | 待办 | 归属角色 | 来源 | 状态 |
 |--------|------|----------|------|------|
-| P1 | REQ-001 真实 L1 处理（stub→真实）已转入 v0.1 标准迭代，由迭代记录跟踪 | PM | xiaobao 提报 REQ-001 / Owner 立项 | 已转入 v0.1（PRD R1 Review中） |
+| P1 | REQ-001 真实 L1 处理（stub→真实）已转入 v0.1 标准迭代，由迭代记录跟踪 | PM | xiaobao 提报 REQ-001 / Owner 立项 | ✅ 已完成（v0.1 已关闭，2026-07-04） |
 | P1 | REQ-002 数据架构调研：读 Horizon/aggregator、答 4 岔路口、出数据架构方案 | Architect | Owner 指派 REQ-002 / 2026-06-29 ai PM 承接 | 已完成（2026-06-29，见 ad-hoc spike） |
-| P1 | ai↔xiaobao news-l1 真实数据端到端联调 + KB search 接入：① ai 测试环境部署、提供 `AI_HUB_BASE_URL`（`/health` 200，当前 127.0.0.1:8100 未运行）② 鉴权 token ③ 核对 `/v1/runs/news-l1` 与更新后 `contracts/news-l1.md` 一致 ④ 新接入 xiaobao `POST /v1/kb-search`（`x-admin-token`；v0.1 `tools/kb.py` 占位禁用、属新工作）⑤ 回填真实调用证据 | Developer | xiaobao 2026-07-01 响应（coordination `communications/REQ-001`、`contracts/kb-search.md`） | ✅ 已完成（2026-07-04，4 条用例通过，Owner 抽样验收通过；KB 空结果语义 D-3 待优化为非阻塞遗留） |
+| P1 | ai↔xiaobao news-l1 真实数据端到端联调 + KB search 接入：① ai 测试环境部署、提供 `AI_HUB_BASE_URL`（`/health` 200，当前 127.0.0.1:8100 未运行）② 鉴权 token ③ 核对 `/v1/runs/news-l1` 与更新后 `contracts/news-l1.md` 一致 ④ 新接入 xiaobao `POST /v1/kb-search`（`x-admin-token`；v0.1 `tools/kb.py` 占位禁用、属新工作）⑤ 回填真实调用证据 | Developer | xiaobao 2026-07-01 响应（coordination `communications/REQ-001`、`contracts/kb-search.md`） | ✅ 已完成（2026-07-04，4 条用例通过，Owner 抽样验收通过，v0.1 已关闭；KB 空结果语义 D-3 待优化为非阻塞遗留，转入下一迭代） |
 
 ## Bootstrap 记录
 - 时间：2026-06-21

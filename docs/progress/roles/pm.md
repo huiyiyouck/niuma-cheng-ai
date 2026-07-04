@@ -1,5 +1,30 @@
 # PM（产品经理）角色日志
 
+## 2026-07-04 — 会话摘要（v0.1 迭代关闭检查 + 收尾归档）
+- 本次角色：PM（产品经理，ck）
+- 动作：执行 v0.1 迭代关闭检查 9 项清单，通过后执行收尾归档。
+- 背景：
+  - 实现 R1 Architect + DevOps 两方 Review 均通过（2026-07-04）
+  - 端到端联调 4 条用例通过（公网端到端 / 内网直连 / KB 命中 / KB 空结果）
+  - Owner 抽样验收通过（coordination 2026-07-04 记录）
+  - Developer 自测 40 passed
+  - 前置小问题：test-report Architect 状态表未同步、36→40 passed 不一致、部署就绪耗时数字未更新
+- 关闭检查结论：**通过**，9 项清单全部满足（含 2 项流程门禁：实现 R1 Review 已补结论、Owner 验收已确认）
+- 本次产出：
+  - 修 `v0.1-test-report.md`：Architect Review 状态表从「待Review」→「通过」；结论段 36 passed → 40 passed
+  - 更新 `v0.1.md`：概览置「已关闭」、实现阶段表格状态更新、部署就绪检查置通过、CN-001/CN-002 归档、迭代关闭归档区全量填充（Owner 验收通过、关闭结论可关闭、遗留项清单）
+  - 更新 `INDEX.md`：当前状态置「v0.1 已关闭」、版本列表加 summary 链接、最近收尾摘要加 PM 行、跨任务待办 REQ-001 + 端到端联调置已完成、Change Notes 加归档提示
+  - 生成 `v0.1-summary.md`：迭代归档摘要（基本信息 / 各阶段状态 / 交付物 / AC 映射 / CN / 测试质量 / 遗留项 / 关键数据 / 下一步）
+  - 更新 PM 角色日志（本条）
+  - coordination 侧：REQ-001 置已关闭（见 coordination `communications/REQ-001-news-l1.md` + `REQUESTS.md`）
+- 关联迭代：v0.1（已关闭）
+- 关联 Change Note：CN-001 / CN-002 已随 v0.1 归档
+- 遗留问题 / 下一步：
+  - v0.2 立项（PM，待 Owner 确定范围）：建议含发布检查项 1/2（托管化 + logging）+ D-3（KB 空结果语义）+ Architect 观察项 1/2
+  - 部署阶段：DevOps 托管化 + 生产多 provider 验证
+  - 非阻塞遗留项：4 条发布检查项 + Architect 5 条观察项 + D-2 + D-3，全部转入下一迭代
+- 收尾状态：已收尾（v0.1 已关闭）
+
 ## 2026-06-30 — 会话摘要（设计 R1 PM Review）
 - 本次角色：PM（产品经理，ck）
 - 动作：作为设计文档指定 Review 方之一，review `v0.1-design.md`（R1）。
