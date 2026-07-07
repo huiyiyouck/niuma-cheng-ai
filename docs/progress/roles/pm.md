@@ -1,5 +1,24 @@
 # PM（产品经理）角色日志
 
+## 2026-07-04 — 会话摘要（v0.2 标准迭代启动）
+- 本次角色：PM（产品经理，ck）
+- 动作：创建 v0.2 PRD 启动标准迭代，承接 v0.1 遗留问题。
+- 背景：v0.1 已关闭（2026-07-04），遗留项转入 v0.2：4 条发布检查项（托管化 / logging / 生产多 provider / 耗时调优）、Architect 5 条观察项、D-2（上下文充分性阈值）、D-3（KB 空结果语义）。
+- v0.2 范围：服务稳定性提升（结构化 logging、服务托管化、KB 空结果语义优化、工具并发）+ RunRecord 持久化审计记录 + 多 provider 生产验证准备。不改对外 news-l1 v1 契约。
+- 本次产出：
+  - 创建 `v0.2.md`：迭代记录，PRD 阶段 R1 待 Review
+  - 创建 `v0.2-prd.md`：PRD R1（6 条用户故事 US-1~6，7 条验收标准 AC-1~7，5 条开放问题 O-1~5）
+  - 更新 `INDEX.md`：当前状态切「v0.2 标准迭代 · PRD 阶段」、版本列表加 v0.2 行、下一步入口更新
+  - 更新 PM 角色日志（本条）
+- Review：指定 Architect + Developer，PRD R1 待 Review
+- 关联迭代：v0.2（进行中）
+- 关联 Change Note：无（初版 PRD，待 Review 后可能产生 CN）
+- 遗留问题 / 下一步：
+  - Architect + Developer 做 PRD R1 Review
+  - 设计阶段 Architect 落地结构化 logging、工具并发、RunRecord 存储方案
+  - 实现阶段 Developer 落地各项功能
+- 收尾状态：进行中（v0.2 PRD 阶段，未收尾）
+
 ## 2026-07-04 — 会话摘要（v0.1 迭代关闭检查 + 收尾归档）
 - 本次角色：PM（产品经理，ck）
 - 动作：执行 v0.1 迭代关闭检查 9 项清单，通过后执行收尾归档。

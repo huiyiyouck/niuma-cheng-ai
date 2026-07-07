@@ -4,11 +4,11 @@
 
 ## 当前项目状态
 
-- 当前迭代：v0.1（已关闭，2026-07-04）
-- 当前模式：标准迭代（已关闭）
-- 当前阶段：v0.1 **已关闭**—— PRD R2 定稿 + 设计 R1 定稿 + 实现 R1 两方 Review 通过 + 自测 40 passed + 部署就绪检查通过 + 端到端联调 4 条用例通过 + Owner 验收通过 + 迭代关闭检查通过
+- 当前迭代：v0.2（进行中）
+- 当前模式：标准迭代（进行中）
+- 当前阶段：v0.2 **PRD 阶段**—— R1 已起草，待 Architect + Developer Review
 - 阻塞项：无
-- 下一步入口：① v0.2 立项（PM，待 Owner 确定范围：4 条发布检查项 + Architect 5 条观察项 + D-2/D-3 + KB 空结果语义）；② 部署阶段 DevOps 托管化 + 生产多 provider 验证；③ coordination REQ-001 已关闭同步
+- 下一步入口：① Architect + Developer 做 PRD R1 Review；② 设计阶段 Architect 落地结构化 logging、工具并发、RunRecord 存储方案；③ 实现阶段 Developer 落地各项功能
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -21,6 +21,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
+| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R1 待 Review） |
 | v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | [v0.1-summary.md](iterations/v0.1-summary.md) | 已关闭（2026-07-04，[自测报告](iterations/v0.1-test-report.md)） |
 
 ## 当前 Change Notes
