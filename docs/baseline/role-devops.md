@@ -65,7 +65,7 @@
 
 1. 确认当前助手入口文件的启动必做已完成；若本会话尚未执行，再补做。
 2. 如果 `docs/progress/roles/devops.md` 不存在，从 `docs/templates/role-log.md` 创建。
-3. 先读 `docs/progress/INDEX.md` 的当前状态和下一步入口；如进入标准迭代，再只读当前 `vX.Y.md` 中部署阶段、实现/自测状态和当前阶段摘要。
+3. 先读 `docs/progress/INDEX.md` 的当前状态和下一步入口；如进入标准迭代，再只读当前 `vX.Y.md` 中部署就绪检查、实现/自测状态和当前阶段摘要。
 4. 判断本次出场场景：
    - 被指定为其他阶段的 Review 方 → 读被 Review 的文档，只审部署方式、环境变量、云服务、发布风险。Review 完成后在文档 Review 记录区域追加结论，并更新 `vX.Y.md` 中对应 Review 结果。
    - 独立运维任务 → 按 `work-modes.md` Ops Task 模式执行，跳转到步骤 7
