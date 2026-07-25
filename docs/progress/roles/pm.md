@@ -1,5 +1,38 @@
 # PM（产品经理）角色日志
 
+## 2026-07-25 — 会话摘要（状态重新对齐 + 承接 REQ-003 + v0.2 范围重排）
+- 本次角色：PM（产品经理，ck）
+- 动作：Owner 要求「看项目 + 拉最新代码 + 全面重新对齐 + 汇报进度」。执行工作流启动例行 → 核对代码/文档/协调仓三方实况 → 发现并处理 3 条对齐缺口 → 承接 REQ-003 → 按 Owner 拍板重排 v0.2 范围。
+- 同步结果：ai 与 coordination 两仓均 `git pull --rebase` → Already up to date（ai HEAD `a53b680`，coordination HEAD `156b008`）。**无新代码，但协调仓有 20 天未响应的 REQ-003。**
+- 发现的 3 条对齐缺口：
+  1. **重大**：coordination `REQ-003`（v0.6.1 集成模式变更，状态「待 ai · PM 评估承接」——责任方即本席位）2026-07-05 提报、07-12 R2 更新，至 07-25 无人响应约 20 天；xiaobao 侧前置全部就绪（PRD R2 定稿 / 设计 R2 三方通过 / `contracts/news-l1-db.md` v1 出稿）在等 ai。且 v0.2 PRD 起草于 07-04，比 REQ-003 提报早一天，完全未包含它。
+  2. `INDEX.md` 阻塞项写「无」，实际卡在 REQ-003 未评估导致范围未定。
+  3. `project-context.md` 模块地图仍是 v0.1 前状态（「⚠️ 当前为骨架 / `llm_process` 返回占位输出 / `tags.processing` 含 `stub`」），且漏 `llm/`、`tools/`、`tasks.py` 三块，会直接误导新接手会话。
+- Owner 决策（2026-07-25）：① **v0.2 重排，REQ-003 为主线**（而非排 v0.3 或作废 v0.2）；② 两处过期记录当场订正。
+- REQ-003 评估结论（承接）：无异议部分——轮询 worker、适配层封装、翻译留 ai 侧、schema 权属归 xiaobao、双模式并行非替换、卡死回收由 xiaobao 执行。**核对出 1 个 P0 契约冲突**：`news-l1-db` v1 要求 ai 写 `score_total` 最终值，与 ① `news-l1` HTTP v1「不由 ai 计算」② ai 业务边界「不做 `score_total`」③ 该契约自身「输出语义以 HTTP 契约为准」三处冲突（契约内部自相矛盾）。另核对确认 `title`/`context`/`analysis` 在 HTTP v1 output 与 `L1Output` 中本已存在，非新增能力。
+- 本次产出（ai 侧）：
+  - 重写 `v0.2-prd.md`：主线 REQ-003，7 条用户故事（US-1~7）、8 条验收标准（AC-1~8）、7 条开放问题（O-1~7，O-1 为 P0 阻塞定稿）；Review 方由两方扩为**三方**（新增 DevOps，理由：运行形态从 HTTP 服务变常驻 worker + 新增数据库凭据，原「PRD 阶段不涉及部署变更」的免除理由已不成立）
+  - 更新 `v0.2.md`：概览改写 + 新增「范围重排记录」小节；PRD 阶段门禁把旧 R1 标「未 Review（范围重排作废）」、新增重写后的 R1 行
+  - 更新 `INDEX.md`：当前阶段 / 阻塞项（写明 O-1）/ 下一步入口 / 版本列表状态；跨任务待办登记 REQ-003 承接 + 4 条顺延项（含归属角色）
+  - 订正 `project-context.md` 模块地图：删过期骨架警示、补 `llm/`+`tools/`+`tasks.py`+`tests/`、写明 v0.1 已交付实况
+- 本次产出（coordination 侧，PM 跨项目权限内）：
+  - `REQUESTS.md`：REQ-003 承接方填 ai·PM（ck）、转入迭代 ai v0.2、状态「已提报」→「开发中（转入迭代）」+ 标注待回应冲突
+  - 新建 `communications/REQ-003-db-boundary-async.md`：承接结论 + 迟滞说明 + O-1 冲突（含方案 A/B）+ O-5 枚举瑕疵 + R-1~R-3 就绪度确认 + 待跟进表 7 项
+  - `STATUS.md`：最近更新、ai 行、xiaobao 行备注、新增 §4 REQ-003 谁等谁、下一步汇总加 2 条
+- 范围顺延（转 v0.3 / 部署阶段）：服务托管化、工具调用并发化、RunRecord 持久化、多 provider 生产验证。理由：形态均依赖 worker 架构，先做外围会返工。
+- 边界守规：未替 Architect 定适配层分层/事务边界（列为 O-2/O-6）；未替 DevOps 定托管与凭据方案（O-7）；**未自行修改任何 contracts/**（O-1/O-5 均以沟通文档向 xiaobao 提出，契约变更由权属方执行）；未改 xiaobao 的 `docs/progress/`。
+- 关联迭代：v0.2（PRD 阶段，R1 待三方 Review）
+- 关联非迭代工作：跨项目协作 · REQ-003 承接
+- 关联 Change Note：无（PRD 未定稿，走重写而非 Change Note）
+- 遗留问题/风险：
+  - **O-1 `score_total` 归属冲突未解 → v0.2 PRD 不得定稿**，需 xiaobao 回应或 Owner 拍板。
+  - `ai_worker` 角色 GRANT、schema 迁移落地、凭据注入渠道三项就绪度未知，是实现阶段前置。
+  - 本机无 `.venv`，本次未跑单测（PM 职责不含跑测试，但 Developer 进场前需先建环境）。
+  - 响应端可见性缺口是本次 20 天迟滞的根因，已由 REQ-004（参谋长提报、待 workboard 承接）覆盖；ai 侧对策：每次会话启动扫协调仓需求池。
+- 下一步入口：① 切 Architect 做 v0.2 PRD R1 Review（重点 O-1 架构影响 / O-2 适配层边界 / O-3 worker 参数 / O-6 事务边界）；② 切 Developer 做 R1 Review（工程成本 / claim 与写回实现 / 验收可验证性）；③ 切 DevOps 做 R1 Review（运行形态 / 凭据注入 O-7）；④ Owner 或 xiaobao 会话回应 REQ-003 的 5 项。
+- coordination 依据：`../niuma-cheng-coordination`，操作前 `git pull --rebase` 已是最新（HEAD `156b008`）。
+- 收尾状态：已收尾（2026-07-25，两仓改动已 commit/push）
+
 ## 2026-07-04 — 会话摘要（v0.2 标准迭代启动）
 - 本次角色：PM（产品经理，ck）
 - 动作：创建 v0.2 PRD 启动标准迭代，承接 v0.1 遗留问题。

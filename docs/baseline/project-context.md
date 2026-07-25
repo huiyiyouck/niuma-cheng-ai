@@ -15,11 +15,14 @@ Python + FastAPI + LangGraph；AI 推理走外部 OpenAI 兼容 API（本服务�
 ## 架构与模块地图
 > 关键目录 / 模块 → 职责，让 Agent 不通读代码就知道改动该去哪。
 - `src/agent_hub/main.py` — FastAPI 入口（`/health`、`POST /v1/runs/news-l1`）
-- `src/agent_hub/config.py` — 环境变量（外部 LLM API / 搜索）
+- `src/agent_hub/config.py` — 环境变量与 provider 配置（外部 LLM API / 搜索 / KB 回调）
 - `src/agent_hub/schemas.py` — `L1Input` / `L1Output` 跨服务契约
-- `src/agent_hub/graphs/news_l1.py` — news-l1 LangGraph 固定流水线（`kb_search → link_read → web_search → llm_process`）
-- `tests/test_health.py` — 骨架冒烟测试
-- ⚠️ 当前为骨架：各节点真实逻辑（LLM 调用 / 外部检索 / 链接读取）未实现，`llm_process` 返回结构化占位输出（`tags.processing` 含 `stub`）。
+- `src/agent_hub/tasks.py` — 任务类型注册与分发
+- `src/agent_hub/graphs/news_l1.py` — news-l1 LangGraph 条件图编排（`ingest_context → kb_search / link_read / web_search 按需路由 → llm_process → normalize_output`，见 ADR-0001）
+- `src/agent_hub/llm/` — LLM 调用层：`client.py`（多 provider fallback 链，见 ADR-0002）/ `prompts.py` / `json.py`（输出解析与容错）
+- `src/agent_hub/tools/` — 按需工具：`kb.py`（回调 xiaobao `POST /v1/kb-search`）/ `link_reader.py`（自抓 HTTP）/ `web_search.py` / `base.py`
+- `tests/` — 单测 40 例：`test_health` / `test_news_l1` / `test_news_l1_tools` / `test_llm_client` / `test_config_providers`
+- 实现状态：v0.1 已交付真实 L1 处理（2026-07-04 关闭，端到端联调 4 例通过、Owner 抽样验收通过），非骨架、无 stub 输出；单条耗时 74~79s。
 
 ## 启动方式
 ```bash

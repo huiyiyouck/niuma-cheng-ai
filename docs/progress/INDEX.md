@@ -4,11 +4,11 @@
 
 ## 当前项目状态
 
-- 当前迭代：v0.2（进行中）
+- 当前迭代：v0.2（进行中，2026-07-25 范围重排：主线改为承接 REQ-003 数据库边界异步解耦）
 - 当前模式：标准迭代（进行中）
-- 当前阶段：v0.2 **PRD 阶段**—— R1 已起草，待 Architect + Developer Review
-- 阻塞项：无
-- 下一步入口：① Architect + Developer 做 PRD R1 Review；② 设计阶段 Architect 落地结构化 logging、工具并发、RunRecord 存储方案；③ 实现阶段 Developer 落地各项功能
+- 当前阶段：v0.2 **PRD 阶段**—— R1 已按 REQ-003 重写，待 Architect + Developer + DevOps 三方 Review
+- 阻塞项：**O-1（P0）`score_total` 归属冲突** —— `news-l1-db` v1 契约要求 ai 写 `score_total` 最终值，与 `news-l1` HTTP v1 契约「不由 ai 计算」、ai 业务边界、以及该契约自身「输出语义以 HTTP 契约为准」三处冲突；需 xiaobao 侧订正契约或 Owner 决定迁移职责，否则 PRD 不得定稿。已在 coordination `communications/REQ-003-db-boundary-async.md` 向 xiaobao 提出。
+- 下一步入口：① Architect + Developer + DevOps 做 PRD R1 Review（O-1 须先有结论）；② 设计阶段 Architect 定适配层分层、worker 运行参数、事务边界（O-2/O-3/O-6）；③ DevOps 确认 `ai_worker` 角色 GRANT 与凭据注入（O-7）+ 共享库连接信息；④ 实现阶段 Developer 落地适配层 + worker 闭环 + logging + KB 语义
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -21,7 +21,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
-| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R1 待 Review） |
+| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R1 重写待三方 Review，主线 REQ-003） |
 | v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | [v0.1-summary.md](iterations/v0.1-summary.md) | 已关闭（2026-07-04，[自测报告](iterations/v0.1-test-report.md)） |
 
 ## 当前 Change Notes
@@ -74,6 +74,10 @@
 |--------|------|----------|------|------|
 | P1 | REQ-001 真实 L1 处理（stub→真实）已转入 v0.1 标准迭代，由迭代记录跟踪 | PM | xiaobao 提报 REQ-001 / Owner 立项 | ✅ 已完成（v0.1 已关闭，2026-07-04） |
 | P1 | REQ-002 数据架构调研：读 Horizon/aggregator、答 4 岔路口、出数据架构方案 | Architect | Owner 指派 REQ-002 / 2026-06-29 ai PM 承接 | 已完成（2026-06-29，见 ad-hoc spike） |
+| P1 | 承接 coordination REQ-003（数据库边界异步解耦）：已于 2026-07-25 承接并转入 v0.2 标准迭代，由迭代记录跟踪；**阻塞项 O-1（`score_total` 归属冲突）待 xiaobao 侧回应** | PM | xiaobao PM 提报 REQ-003（2026-07-05 初版 / 07-12 R2）/ Owner 2026-07-25 拍板 v0.2 重排 | 进行中（v0.2 PRD R1 待三方 Review） |
+| P1 | v0.2 顺延项 ①服务托管化（systemd/launchd）②工具调用并发化：托管对象与并发单元均随 v0.2 worker 形态确定后再定，避免返工 | DevOps（①）+ Architect/Developer（②） | v0.1 发布检查项 1/4 / 2026-07-25 v0.2 范围重排 | 待启动（排 v0.3） |
+| P2 | v0.2 顺延项 ③RunRecord 持久化：与 v0.2 的 `processed_news`/`tasks` 写回存在职责重叠，待 DB 模式落地后重估还缺哪些审计信息 | Architect | v0.1 下一步入口 / 2026-07-25 v0.2 范围重排 | 待启动（排 v0.3，需先重估范围） |
+| P2 | v0.2 顺延项 ④生产 ≥2 provider 真实 fallback 验证 | DevOps | v0.1 发布检查项 3 / 2026-07-25 v0.2 范围重排 | 待启动（部署阶段或 v0.3） |
 | P1 | ai↔xiaobao news-l1 真实数据端到端联调 + KB search 接入：① ai 测试环境部署、提供 `AI_HUB_BASE_URL`（`/health` 200，当前 127.0.0.1:8100 未运行）② 鉴权 token ③ 核对 `/v1/runs/news-l1` 与更新后 `contracts/news-l1.md` 一致 ④ 新接入 xiaobao `POST /v1/kb-search`（`x-admin-token`；v0.1 `tools/kb.py` 占位禁用、属新工作）⑤ 回填真实调用证据 | Developer | xiaobao 2026-07-01 响应（coordination `communications/REQ-001`、`contracts/kb-search.md`） | ✅ 已完成（2026-07-04，4 条用例通过，Owner 抽样验收通过，v0.1 已关闭；KB 空结果语义 D-3 待优化为非阻塞遗留，转入下一迭代） |
 
 ## Bootstrap 记录
