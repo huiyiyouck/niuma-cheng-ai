@@ -1,5 +1,26 @@
 # Developer 角色日志
 
+## 2026-07-26 — v0.2 PRD R1 Review
+
+- 本次角色：Developer
+- 动作：Review（PRD R1 三方之末，DevOps / Architect 已先交，均未通过）
+- 涉及文档：`docs/progress/iterations/v0.2-prd.md`（追加 Review 记录 + Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（PRD 门禁 + Review 记录）、`docs/progress/INDEX.md`；实读 coordination `contracts/news-l1-db.md` v1.1、`contracts/news-l1.md` v1、`communications/REQ-003-db-boundary-async.md`；核对 `src/agent_hub/{main,tasks,schemas,config}.py`、`graphs/news_l1.py`、`llm/client.py`、`tools/{base,kb}.py`、`tests/`、`requirements.txt`、`.env.example`
+- 结论：**PRD R1 Developer Review 未通过**（2 阻塞 3 高 1 中 + 事实层刷新 8 项）。
+  1. **阻塞①`tags_v2` 第五类契约冲突**：`news-l1-db` v1.1 要 `sentiment`，`news-l1` HTTP 契约（L133）与 ai `schemas.py:41-46` 均为 `processing`，ai 从不产 `sentiment` → AC-4 写回内容无法确定。且 `processing` 承载 `engine:`/`llm:`/`degraded:` 标识（`news_l1.py:370-372`），是 worker 模式下判断降级的唯一结构化线索，不能丢。与 O-1 同类型的起草笔误，提 C-10 请 xiaobao 订正。
+  2. **阻塞②同步基线 + `/health` 探活 + 74~79s 阻塞三者不可同时成立**：实查 `async def|await` **0 命中**，LLM 走同步 `httpx.post`。Architect O-4（DB 模式仍监听 `/health`）+ DevOps 探活要求组合后，若 worker 与 uvicorn 同 event loop，单条处理会整段阻塞 `/health` → 假死误判 → 重启 → 反制造残留 `processing` 锁（比无探活更糟）。建议增补「处理中 ≥60s 时 `/health` 仍须 2s 内返回」AC + §5 写死「本迭代不引入 async 改造」（连带约束驱动选型倾向 psycopg3 同步）。
+  3. **高③AC-7 三点**：末句「`processing` 不含 `stub`」已满足（`src/` 0 命中 + `test_news_l1.py:186` 已有断言）属空条款；缺陷实际在 `news_l1.py:213` 而非 `kb.py`（`kb.py:72` 空结果已返回 `ok=True, items=[]`，语义本就正确）；同一 bug 在 `:150`(link)/`:179`(web)/`:213`(kb) 三处同构，只修 KB 会留三工具语义不一致。
+  4. **高④AC-2 与 AC-8 判据互斥**：同一次验证会同时判通过与不通过（AC-2 验"跑通"、AC-8 验"等价"，而 DB 模式输入本就不等价）。建议 AC-2 判依赖方向（核心 diff 为空 + 两侧均产合法 `L1Output`）、AC-8 判"输入等价前提下语义一致"并列出已知差异。
+  5. **高⑤C-1 应拆分**：对照 R-5 结构说明，`source_item_url` **可撤回**（x_twitter 可由 `tweet_id`+`author_username` 构造，R-5 给了空 username 兜底规则；rss 无链接字段但仅单测覆盖不阻塞），`domain_tags` **仍缺仍需订正**。实现要点：`_extract_url`（`:407`）只认 `raw_content["url"]`/`["canonical_url"]`，x_twitter content 两键皆无 → 适配层必须显式回填，否则 link_read 不报错不降级、静默失效。
+  6. **中⑥AC-4 字段来源**：`analysis` 空值规则未定；`context` 因 URL 证据过滤（`:362-367`）在 DB 模式大概率恒空；`needs_context` 在 `processed_news` 无列可写，丢弃需显式决策。
+  7. **工程成本判断**：处理核心（`tasks.py`/`graphs/`/`llm/`）**零改动**——`run_task` 签名已与传输层无关，Architect O-2 倾向确认成立且成本近零，是 v0.2 最大复用面。新增量集中在入向映射 / 出向映射+写回事务 / claim+worker 循环+优雅停机 / 结构化 logging 四块；其中 logging 是横切改造（现状零 logging），与 AC-2「核心零改动」存张力，需以注入方式实现。并发 claim 与事务回滚必须对真实 PG 测，会消耗 R-4 预置的 5 条队列。
+  8. **契约版本核对（附带产出）**：另两方实读依据标注 v1，契约实为 v1.1。逐条复核 C-1~C-9 对 v1.1 **除 C-1 的 URL 分支外全部仍成立**；O-1/O-5 已闭环。建议后续 Review 标注契约版本号。
+- 关联迭代：v0.2
+- 关联非迭代工作：无
+- 关联 Change Note：无
+- 遗留问题/风险：① PRD 事实层已被 coordination 07-25~07-26 三帖推翻（O-1 已定案方案 A、契约订正 v1.1、R-1/R-2/R-4/R-5 前置已解除、造数已预置 5 条、系统仅有 x_twitter 真实数据），R2 须先刷新 8 项再改意见，否则定稿带过期前提 ② 新增契约缺项 C-10（`tags_v2`）需 PM 转达 xiaobao ③ ai 侧唯一剩余外部依赖是 `ai_worker` 口令待 Owner 带外交付 ④ 生产库 GRANT 未执行（上生产前置，不进 v0.2 部署就绪检查）
+- 下一步入口：PM 按三方意见改 PRD R2（含事实层刷新 + 三类源验收分层进 §3 + C-10 转达 xiaobao）；R2 定稿后进设计阶段（Architect 定适配层分层 O-2 / worker 参数 O-3 / 事务边界 O-6）
+- 收尾状态：已收尾（Review 交付完成）
+
 ## 2026-07-04 — v0.1 实现 R1 收尾铺写（Developer 侧）
 - 本次角色：Developer（收尾铺写，不改代码 —— 实现 R1 已定稿，再改需走 R2）
 - 动作：核实联调证据 + 同步元信息 + 登记发布检查项归属 + 铺写迭代关闭归档区

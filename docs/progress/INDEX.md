@@ -6,9 +6,9 @@
 
 - 当前迭代：v0.2（进行中，2026-07-25 范围重排：主线改为承接 REQ-003 数据库边界异步解耦）
 - 当前模式：标准迭代（进行中）
-- 当前阶段：v0.2 **PRD 阶段 — R1 Review中** —— DevOps 已 Review（2026-07-25，**未通过**，4 高 2 中 1 低）；Architect 已 Review（2026-07-25，**未通过**，3 阻塞 3 高 3 中 1 低）；Developer 待 Review
-- 阻塞项：① **O-1（P0）`score_total` 归属冲突** —— `news-l1-db` v1 契约要求 ai 写 `score_total` 最终值，与 `news-l1` HTTP v1 契约「不由 ai 计算」、ai 业务边界、以及该契约自身「输出语义以 HTTP 契约为准」三处冲突；需 xiaobao 侧订正契约或 Owner 决定迁移职责，否则 PRD 不得定稿。已在 coordination `communications/REQ-003-db-boundary-async.md` 向 xiaobao 提出。② **DevOps R1 四条高严重度缺项待 PM 修改**（DB 模式探活面 / 优雅停机与回滚残留锁 / DB 连接异常口令脱敏 / 测试库造数依赖未列前置）。③ **测试环境已不在**：`.env` 不存在、`8100` 无监听，v0.2 部署面是环境重建 + 新增共享库依赖，非增量。④ **Architect R1 三条阻塞级契约缺口**（DB 模式输入构造缺口 → AC-8 不可达 / `tasks.status` 枚举无真源 → AC-4·AC-5 不可实现 / `processed_news` INSERT·UPDATE 语义与触发器时序未定）；连带新增 **C-1~C-9 共 9 条契约缺项**待 PM 转达 xiaobao，其中 C-1/C-2/C-3 为 P0。
-- 下一步入口：① Developer 补做 PRD R1 Review；② PM 按 DevOps + Architect R1 意见修改 PRD 进 R2（O-1 须先有结论；Architect 已给结论：支持方案 A）；③ PM 把 Architect 的 C-1~C-9 契约缺项转达 coordination `REQ-003` 待跟进表（本会话未写 coordination，原因见 Architect 日志）；④ 设计阶段 Architect 落定 O-2 适配层分层（倾向切在 `tasks.run_task` 之上）、O-6 事务边界（claim/处理/写回三段分离），O-4 已定（进程级 + DB 模式仍监听 `/health`）、O-3 已有 DevOps 约束（单批 N ≤ 8、轮询 10~30s、灰度期单实例，Architect 已确认成立）；⑤ DevOps 待 xiaobao 回应 R-1/R-2/R-3 后落地凭据注入（O-7 方案已定）+ 重建测试环境；⑥ 实现阶段 Developer 落地适配层 + worker 闭环 + logging + KB 语义
+- 当前阶段：v0.2 **PRD 阶段 — R1 三方 Review 齐、均未通过，待 PM 改 R2** —— DevOps（2026-07-25，4 高 2 中 1 低）；Architect（2026-07-25，3 阻塞 3 高 3 中 1 低）；Developer（2026-07-26，2 阻塞 3 高 1 中 + 事实层刷新 8 项）
+- 阻塞项：① ~~O-1（P0）`score_total` 归属冲突~~ **已解除**（2026-07-25 xiaobao 定案方案 A、契约订正 v1.1，ai PM 已在 coordination 回执采纳；**PRD 正文尚未同步，待 R2 落实**）。② **DevOps R1 四条高严重度缺项待 PM 修改**（DB 模式探活面 / 优雅停机与回滚残留锁 / DB 连接异常口令脱敏 / ~~测试库造数依赖~~ 造数已由 xiaobao 交付 `seed_ai_queue_test.sql` 并预置 5 条 queued）。③ **测试环境已不在**：`.env` 不存在、`8100` 无监听，v0.2 部署面是环境重建 + 新增共享库依赖，非增量。④ **Architect R1 三条阻塞级契约缺口**（DB 模式输入构造缺口 → AC-8 不可达 / `tasks.status` 枚举无真源 → AC-4·AC-5 不可实现 / `processed_news` INSERT·UPDATE 语义与触发器时序未定）；**C-1~C-9 经 Developer 对契约 v1.1 复核，除 C-1 的 `source_item_url` 分支可撤回外全部仍成立**，待 PM 转达 xiaobao。⑤ **Developer R1 两条阻塞**：`tags_v2` 第五类两份契约冲突（DB 契约要 `sentiment`，HTTP 契约与 ai 实现均为 `processing`）→ 新增契约缺项 **C-10**；同步代码基线下「`/health` 探活 + 74~79s 阻塞处理」同进程不可同时成立，需增补探活 AC + 禁 async 改造前置。⑥ **唯一剩余外部依赖**：`ai_worker` 口令待 Owner 经安全渠道交付（连接四要素已收：`127.0.0.1:5432/news_test/ai_worker`）。
+- 下一步入口：① **PM 按三方 R1 意见改 PRD R2**——须先做**事实层刷新 8 项**（O-1 已定案 / O-5 已订正 / R-1·R-2 已就绪 / 造数已交付 / **系统当前只有 x_twitter 真实数据、三类源验收分层须进 §3** / 生产库 GRANT 与队列耗尽两项新前置），再改问题意见；② PM 把 C-1~C-9（按 Developer 复核结论调整）+ 新增 C-10 转达 coordination `REQ-003` 待跟进表；③ R2 三方复审定稿后进设计阶段：Architect 落定 O-2 适配层分层（倾向切在 `tasks.run_task` 之上，Developer 确认成本近零）、O-6 事务边界（claim/处理/写回三段分离）、DB 驱动选型（Developer 建议 psycopg3 同步，避免破 AC-2）；O-4 已定（进程级 + DB 模式仍监听 `/health`）、O-3 已有约束（单批 N ≤ 8、轮询 10~30s、灰度期单实例）；④ DevOps 拿到口令后落地凭据注入（O-7 方案已定）+ 重建测试环境；⑤ 实现阶段 Developer 落地适配层 + worker 闭环 + logging（须注入式，避免破 AC-2）+ KB 语义（三工具一并修）
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -21,7 +21,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
-| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R1 Review中：DevOps 未通过，Architect/Developer 待做；主线 REQ-003） |
+| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R1 三方 Review 齐、均未通过，待 PM 改 R2；主线 REQ-003） |
 | v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | [v0.1-summary.md](iterations/v0.1-summary.md) | 已关闭（2026-07-04，[自测报告](iterations/v0.1-test-report.md)） |
 
 ## 当前 Change Notes
