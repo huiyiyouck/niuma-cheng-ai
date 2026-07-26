@@ -1,5 +1,19 @@
 # Architect 角色日志
 
+## 2026-07-25 — v0.2 PRD R1 Review（Architect）
+- 本次角色：Architect（架构师）
+- 动作：标准迭代 PRD 阶段 R1 Review（v0.2 范围重排后的重写版，主线 REQ-003）
+- 涉及文档：`docs/progress/iterations/v0.2-prd.md`（追加 §Review 记录 · R1 — Architect Review + 订正 Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（PRD 阶段 R1 行 + Review 记录表）、`docs/progress/INDEX.md`（当前阶段 / 阻塞项 ④ / 下一步入口）；核对 coordination `contracts/news-l1-db.md` v1、`contracts/news-l1.md` v1、`communications/REQ-003-db-boundary-async.md`、`decisions/0002`，本项目 `src/agent_hub/{main,tasks,schemas}.py`、`graphs/news_l1.py`、`docs/baseline/project-context.md`
+- 结论：**未通过**（3 阻塞 3 高 3 中 1 低，需 PM 修改后进 R2）
+- 核心判断：worker 闭环的**输出侧**（写回 + 状态推进）契约描述较完整，**输入侧**（从 `raw_items` 构造等价处理输入）几乎无真源支撑；AC-8「两模式业务字段等价」按现有可读列授权**不可达**——`domain_tags`（L0 分类结果）与原文 URL（`source_item_url`，HTTP 契约靠调用方补进 `raw_content`）均不在 ai_worker 可读列，`link_read` 路径在 DB 模式整条失效；预取上下文无提供方 → KB 只能由 ai 主动回调 xiaobao `POST /v1/kb-search`，即 **DB 模式并未消除 ai↔xiaobao 的 HTTP 依赖，只是反转了方向**
+- 三条阻塞：① DB 模式输入构造缺口（上条）② `tasks.status` 取值枚举与转移全缺（契约只给了 `l1_status` 枚举）→ AC-4/AC-5「同步更新 tasks 状态」不可实现且不可验证，ai 不得自行猜枚举污染 xiaobao 业务真源 ③ `processed_news` 由谁 INSERT 未定（职责表写 xiaobao「占位创建」但权限矩阵给 ai INSERT+UPDATE）+ `news_positions` 触发器是 INSERT 后触发 → 占位语义下触发器在结果为空时就跑，排序位如何更新无说明；架构倾向 ai INSERT + `raw_item_id` 幂等键 upsert
+- 三条高：④ 契约 §task type 的退避 `[60s,300s,900s]` 未进 claim 规则 SQL（SQL 无任何时间条件）→ 失败条目按轮询节奏被立即重领，几十秒耗尽 3 次重试预算，退避形同虚设 ⑤ 确认 DevOps 的 `N × 79s < 1800s → N ≤ 22`、建议 N ≤ 8 推导成立，并判定该不变式是**正确性约束**（违反会产生 xiaobao 误回收 + ai 仍在处理的双写竞态），应写进 AC-3 而非只留在 O-3 ⑥ claim 原子性可实现性未验证：`tasks` 无 INSERT 权限（依赖 xiaobao 必建 task，契约未承诺）+ PG 的 `SELECT FOR UPDATE` 按表级 UPDATE 判权而契约只给列级，须在实库验证
+- 开放问题结论：**O-1 支持方案 A**（`score_total` 归 xiaobao）——加权是消费侧策略而非处理侧事实、与 `decisions/0002` 多调用方定位冲突、会形成权重真源跨仓双向耦合；补充方案 A 必须同时定 xiaobao 补算时机（否则冲突从「谁算」推迟成「什么时候算」）。**O-4 定为进程级 + DB 模式仍监听 `/health`**（取 DevOps 问题 1 的方案①，两者不矛盾，复用成本近零，建议 `/health` 附 `mode` + `last_poll_at`）。**O-2 倾向切在 `tasks.run_task` 之上**（v0.1 入口已解耦，`main.py:32` 之下无传输层概念，适配层收敛为两个映射器 + worker 循环）。**O-6 倾向三表同事务，但 LLM 调用必须在事务外**（claim 短事务 / 处理无事务 / 写回短事务三段，避免 idle-in-transaction）
+- 新增契约缺项 C-1~C-9（P0×3 / P1×2 / P2×4）已列表写入 PRD Review 记录，需 PM 转达 coordination `REQ-003` 待跟进表
+- 与并行会话的关系：DevOps 会话同日已完成 R1 Review（未通过，4 高 2 中 1 低），其改动在工作区未提交；本次只追加自己的 Review 章节，未改动其产出（守 [P0] 不覆盖未归属修改 / Review 方不改正文）
+- 遗留问题/风险：本会话**未写 coordination 仓** —— 协调仓工作区存在他人未提交改动（`REQUESTS.md` 为 M 状态），按 [P0] 跨仓写入需先确认 git 同步状态与改动范围，故 C-1~C-9 的跨仓落地留给 PM（PRD 产出方）并需 Owner 确认；另 O-1 仍待 xiaobao 回应，PRD 不得定稿
+- 下一步入口：Developer 补做 PRD R1 Review；PM 按 DevOps + Architect 意见改 PRD 进 R2 并转达 C-1~C-9；三方通过 + O-1 有结论后 Architect 创建 `v0.2-design.md`（落 O-2 / O-6，适配层与 worker 分层 ADR）
+
 ## 2026-07-04 — v0.1 实现 R1 Review（Architect）
 - 本次角色：Architect（架构师）
 - 动作：标准迭代实现阶段 R1 Review

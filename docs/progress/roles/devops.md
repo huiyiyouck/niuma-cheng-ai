@@ -1,5 +1,18 @@
 # DevOps 角色日志
 
+## 2026-07-25 — v0.2 PRD R1 DevOps Review（主线 REQ-003）
+
+- 本次角色：DevOps
+- 动作：Review（PRD R1 · 运行形态变更 / 环境变量与凭据注入 / 探活与健康检查 / 发布风险与回滚条件）
+- 涉及文档：`docs/progress/iterations/v0.2-prd.md`（追加 R1 DevOps Review）、`docs/progress/iterations/v0.2.md`（阶段门禁 + Review 记录）、`docs/progress/INDEX.md`；实读 coordination `contracts/news-l1-db.md` v1 + `communications/REQ-003-db-boundary-async.md`、本项目 `.env.example` / `.gitignore` / `requirements.txt` / `src/agent_hub/{config,main}.py`；运行实查 `lsof 8100/8001/5432`、`ls .env`
+- 结论：**未通过**（需 PM 修改后 R2）。4 高：① DB 模式探活面缺失（进程级开关下 `/health` 消失，worker 静默死亡与空转不可区分，AC 无覆盖）② 优雅停机/回滚时残留 `processing` 锁无验收（AC-5 只覆盖被杀死的被动路径，主动停机必然发生却没写，一次不优雅停机 = N 条延迟 ≥30 分钟）③ AC-6 脱敏未覆盖最主要泄漏路径（DB 连接异常带 DSN/口令）④ 测试库造数依赖未列 §5 前置（ai 对 `raw_items` 只读、无法自行造数，会直接卡部署就绪检查）。2 中：日志 sink 与轮转未定；托管化顺延需在范围边界写明「人工看护灰度、不得无人值守」。1 低：未提新增 DB 驱动与 `.env.example` 更新。同时给出 **O-7 凭据注入结论**（口令只进已被 gitignore 的 `.env`；变量按字段拆分 `AI_DB_HOST/PORT/NAME/USER/PASSWORD` 而非整串 DSN；无热加载故轮换须重启；口令走带外交付）与 **O-3 运维侧约束**（`N × 79s < 1800s` → 单批 N ≤ 22 绝对上限、建议 N ≤ 8；轮询 10~30s；灰度期单实例）。认可项：AC-1 fail-safe 默认、AC-4 单事务、AC-5 不越权回收他人锁、logging 未随托管化一并顺延。
+- 关联迭代：v0.2（PRD 阶段 R1，Review中）
+- 关联非迭代工作：无
+- 关联 Change Note：无
+- 遗留问题/风险：① **测试环境已不在**——`.env` 不存在、`8100` 无监听、本机 `5432` 无监听，v0.2 是环境重建 + 新增共享库外部依赖，部署面大于 v0.1，需在设计/部署阶段按新形态重建 ② coordination R-1/R-2/R-3（`ai_worker` GRANT 就绪 / schema 迁移落地 / 连接信息与凭据渠道）仍待 xiaobao 与 Owner 回应，其中 R-3 是 O-7 落地前置 ③ 造数依赖需 PM 在 coordination REQ-003 待跟进表追加一行 ④ 托管化顺延 v0.3 的代价是 v0.2 worker 崩溃不自动拉起、队列静默积压 ⑤ O-1（P0）未决，PRD 无论如何不能定稿。
+- 下一步入口：Architect / Developer 补做 PRD R1 Review；PM 按本轮意见修改进 R2；DevOps 待 R-3 回应后落地凭据注入 + 重建测试环境。
+- 收尾状态：已收尾
+
 ## 2026-07-04 — 实现 R1 DevOps Review
 
 - 本次角色：DevOps

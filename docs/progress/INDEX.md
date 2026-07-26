@@ -6,9 +6,9 @@
 
 - 当前迭代：v0.2（进行中，2026-07-25 范围重排：主线改为承接 REQ-003 数据库边界异步解耦）
 - 当前模式：标准迭代（进行中）
-- 当前阶段：v0.2 **PRD 阶段**—— R1 已按 REQ-003 重写，待 Architect + Developer + DevOps 三方 Review
-- 阻塞项：**O-1（P0）`score_total` 归属冲突** —— `news-l1-db` v1 契约要求 ai 写 `score_total` 最终值，与 `news-l1` HTTP v1 契约「不由 ai 计算」、ai 业务边界、以及该契约自身「输出语义以 HTTP 契约为准」三处冲突；需 xiaobao 侧订正契约或 Owner 决定迁移职责，否则 PRD 不得定稿。已在 coordination `communications/REQ-003-db-boundary-async.md` 向 xiaobao 提出。
-- 下一步入口：① Architect + Developer + DevOps 做 PRD R1 Review（O-1 须先有结论）；② 设计阶段 Architect 定适配层分层、worker 运行参数、事务边界（O-2/O-3/O-6）；③ DevOps 确认 `ai_worker` 角色 GRANT 与凭据注入（O-7）+ 共享库连接信息；④ 实现阶段 Developer 落地适配层 + worker 闭环 + logging + KB 语义
+- 当前阶段：v0.2 **PRD 阶段 — R1 Review中** —— DevOps 已 Review（2026-07-25，**未通过**，4 高 2 中 1 低）；Architect 已 Review（2026-07-25，**未通过**，3 阻塞 3 高 3 中 1 低）；Developer 待 Review
+- 阻塞项：① **O-1（P0）`score_total` 归属冲突** —— `news-l1-db` v1 契约要求 ai 写 `score_total` 最终值，与 `news-l1` HTTP v1 契约「不由 ai 计算」、ai 业务边界、以及该契约自身「输出语义以 HTTP 契约为准」三处冲突；需 xiaobao 侧订正契约或 Owner 决定迁移职责，否则 PRD 不得定稿。已在 coordination `communications/REQ-003-db-boundary-async.md` 向 xiaobao 提出。② **DevOps R1 四条高严重度缺项待 PM 修改**（DB 模式探活面 / 优雅停机与回滚残留锁 / DB 连接异常口令脱敏 / 测试库造数依赖未列前置）。③ **测试环境已不在**：`.env` 不存在、`8100` 无监听，v0.2 部署面是环境重建 + 新增共享库依赖，非增量。④ **Architect R1 三条阻塞级契约缺口**（DB 模式输入构造缺口 → AC-8 不可达 / `tasks.status` 枚举无真源 → AC-4·AC-5 不可实现 / `processed_news` INSERT·UPDATE 语义与触发器时序未定）；连带新增 **C-1~C-9 共 9 条契约缺项**待 PM 转达 xiaobao，其中 C-1/C-2/C-3 为 P0。
+- 下一步入口：① Developer 补做 PRD R1 Review；② PM 按 DevOps + Architect R1 意见修改 PRD 进 R2（O-1 须先有结论；Architect 已给结论：支持方案 A）；③ PM 把 Architect 的 C-1~C-9 契约缺项转达 coordination `REQ-003` 待跟进表（本会话未写 coordination，原因见 Architect 日志）；④ 设计阶段 Architect 落定 O-2 适配层分层（倾向切在 `tasks.run_task` 之上）、O-6 事务边界（claim/处理/写回三段分离），O-4 已定（进程级 + DB 模式仍监听 `/health`）、O-3 已有 DevOps 约束（单批 N ≤ 8、轮询 10~30s、灰度期单实例，Architect 已确认成立）；⑤ DevOps 待 xiaobao 回应 R-1/R-2/R-3 后落地凭据注入（O-7 方案已定）+ 重建测试环境；⑥ 实现阶段 Developer 落地适配层 + worker 闭环 + logging + KB 语义
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -21,7 +21,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
-| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R1 重写待三方 Review，主线 REQ-003） |
+| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R1 Review中：DevOps 未通过，Architect/Developer 待做；主线 REQ-003） |
 | v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | [v0.1-summary.md](iterations/v0.1-summary.md) | 已关闭（2026-07-04，[自测报告](iterations/v0.1-test-report.md)） |
 
 ## 当前 Change Notes
