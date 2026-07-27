@@ -9,7 +9,7 @@
 - 当前阶段：v0.2 **PRD 阶段 — R3 已出，待三方复审**（R1 三方均未通过；R2 未经 Review 即被 xiaobao 三方答复推进；R3 于 2026-07-27 按其答复收敛）
 - **本项目核心开发原则（Owner 2026-07-26 定，优先于成本考量）**：以基础夯实、可扩展性强的方式开发，而不是图便捷；宁可现在多干活，也要让系统更健全、后期接入更友好。依据：持续迭代产品，基础越牢后续可扩展越多。已写入 `v0.2-prd.md` §0，后续所有技术取舍按此裁定。
 - 阻塞项：**无阻塞定稿项**。原 4 条（C-2/C-3/C-5/C-10）已于 2026-07-27 由 xiaobao 三方全部闭合，契约连升 v1.2→v1.3、3 列 GRANT 已双库执行。剩余两项均不阻塞：① **C-6 行锁可行性待 ai 侧实证**（拿到口令后在 `news_test` 实测 `SELECT ... FOR UPDATE` 在列级 GRANT 下是否可行；xiaobao 预判可能不满足，若失败其改授表级，结论须回帖）② **Q-1 `needs_context` 是否补列待 xiaobao PM 表态**（其 Architect 已倾向补列）。
-- **唯一外部依赖**：`ai_worker` 口令待 **Owner 经安全渠道交付**（连接四要素已收：`127.0.0.1:5432` / `news_test` / `ai_worker`；口令存服务器 `/root/.secrets/ai_worker_news_test.pw`）。不阻塞设计与实现，只阻塞联调冒烟与 C-6 实证。
+- **唯一外部依赖**：`ai_worker` 口令注入——**归 DevOps 在部署阶段执行**（同机部署，从服务器 `/root/.secrets/ai_worker_news_test.pw` 直接读入部署目录 `.env`，无需 Owner 人肉转交、不经对话传递；Owner 只需授权访问）。连接四要素已收：`127.0.0.1:5432` / `news_test` / `ai_worker`。不阻塞设计与实现，只阻塞联调冒烟与 C-6 实证。已登记跨任务待办 P0。
 - **联调判读须知**：`score_total` 在 database 模式**没有触发点**（xiaobao 的 `calcScoreTotal` 只挂 HTTP 路径），ai 写回后该列保持 NULL → 新闻按分排序沉底、前端评分徽章显示 0。**这不是 ai 的缺陷**，xiaobao 已上报其 PM 补触发点。
 - 下一步入口：① **切 Architect / Developer / DevOps 做 PRD R3 复审**（三方不减方：Architect 复核 C-3 结论反转对设计的影响、Developer 复核 3 处被推翻判断的收敛、DevOps 接手 C-6 实证安排）；② Owner 交付口令；③ R3 通过后进设计阶段：O-2 数据源协议边界、O-6 事务与连接、**O-8 async 改造的切分与回归策略（P0，本迭代最大技术风险）**、O-9 async DB 驱动选型、O-10 `locked_by` 标识规则；④ 实现阶段按 §8 五块切片推进。
 
@@ -78,6 +78,7 @@
 | P1 | REQ-001 真实 L1 处理（stub→真实）已转入 v0.1 标准迭代，由迭代记录跟踪 | PM | xiaobao 提报 REQ-001 / Owner 立项 | ✅ 已完成（v0.1 已关闭，2026-07-04） |
 | P1 | REQ-002 数据架构调研：读 Horizon/aggregator、答 4 岔路口、出数据架构方案 | Architect | Owner 指派 REQ-002 / 2026-06-29 ai PM 承接 | 已完成（2026-06-29，见 ad-hoc spike） |
 | P1 | 承接 coordination REQ-003（数据库边界异步解耦）：已于 2026-07-25 承接并转入 v0.2 标准迭代，由迭代记录跟踪；**阻塞项 O-1（`score_total` 归属冲突）待 xiaobao 侧回应** | PM | xiaobao PM 提报 REQ-003（2026-07-05 初版 / 07-12 R2）/ Owner 2026-07-25 拍板 v0.2 重排 | 进行中（v0.2 PRD R1 待三方 Review） |
+| P0 | **v0.2 部署阶段：注入 `ai_worker` 数据库口令** —— 在服务器上从 `/root/.secrets/ai_worker_news_test.pw`（root only）直接读取，写入部署目录 `.env`（`chmod 600`、仓外），按 O-7 拆字段注入 `AI_DB_PASSWORD`。**同机部署，无需 Owner 人肉转交、不经对话传递**；口令不进 git / coordination / 任何 `docs/` / 会话明文。到位后方可做联调冒烟与 C-6 行锁实证 | DevOps | Owner 2026-07-27 定交付方式 / xiaobao DevOps 2026-07-25 生成口令 | 待执行（部署阶段） |
 | P1 | v0.2 顺延项 ①服务托管化（systemd/launchd）②工具调用并发化：托管对象与并发单元均随 v0.2 worker 形态确定后再定，避免返工 | DevOps（①）+ Architect/Developer（②） | v0.1 发布检查项 1/4 / 2026-07-25 v0.2 范围重排 | 待启动（排 v0.3） |
 | P2 | v0.2 顺延项 ③RunRecord 持久化：与 v0.2 的 `processed_news`/`tasks` 写回存在职责重叠，待 DB 模式落地后重估还缺哪些审计信息 | Architect | v0.1 下一步入口 / 2026-07-25 v0.2 范围重排 | 待启动（排 v0.3，需先重估范围） |
 | P2 | v0.2 顺延项 ④生产 ≥2 provider 真实 fallback 验证 | DevOps | v0.1 发布检查项 3 / 2026-07-25 v0.2 范围重排 | 待启动（部署阶段或 v0.3） |
