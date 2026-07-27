@@ -1,5 +1,18 @@
 # DevOps 角色日志
 
+## 2026-07-27 — v0.2 PRD R4 DevOps 复审（PRD 定稿）
+
+- 本次角色：DevOps
+- 动作：Review（PRD R4 复审 · R3 五条收敛复核 + R4 新增条款的部署侧影响）
+- 涉及文档：`docs/progress/iterations/v0.2-prd.md`（追加 §R4 DevOps 复审 + 订正 Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（当前阶段 + R4 门禁行 + Review 记录表）、`docs/progress/INDEX.md`（当前阶段 / 两条附条件 / R4 复审结果 / 下一步入口 / 版本列表）；**代码实查**：`schemas.py:14-15`、`graphs/news_l1.py:143`·`:173`·`:205`·`:69`、`llm/client.py:99`·`:216`、`tools/link_reader.py:17`
+- 结论：**通过（附条件）**（1 高 1 中 1 低，均不阻塞定稿）。**R3 五条已全部收敛**，其中 2 条强于原建议（§5 连带登记部署就绪检查定义缺口；AC-9.3 三重探活分工拆解）。三方齐通过，**PRD R4 定稿**。本轮问题：**高①（附条件）单条处理无 wall-clock 总预算，AC-3.5 的 `N ≤ 8` 用默认配置就违反其自称的正确性约束** —— `RunOptions.timeout_ms` 默认 180000ms，`kb_search`/`web_search`/LLM 三段各吃满 180s（`ChainedAIClient(providers)` 未传 `budget_ms`，`client.py:99` 的 budget 退化为 `timeout_ms`），仅 `link_read` 被 `min(...,8000)` 限到 8s → **单条最坏 ≈ 548s** 而非推导所用的 79s，`8 × 548s = 4384s ≫ 1800s` → 必然触发 xiaobao 误回收 + ai 仍在处理的双写竞态；按最坏值反推 N ≤ 3。加剧两点：74~79s 是 **HTTP 模式**实测（上下文由 xiaobao 预取），AC-8.2 自己写明 DB 模式 KB 转主动检索、基线本就更高，**基准选错**；尾部场景（Tavily 不可达 / LLM 限流触发 provider fallback 串行重试）恰是故障期。同一数字还撑着 AC-5.7 宽限期下限（632s）与 AC-9.3 陈旧容忍上限。**中②** `worker_alive` 三态化后须写死 HTTP 状态码映射（`running`→200 / `stopping`→**200** / `dead`→非 200，建议 503），否则托管层探针判状态码而非响应体字段，`stopping` 落进非 200 会在优雅停机窗口内被判死重启。**低③** 建议设计阶段开工时并行启动环境准备与 C-6 实证。
+- 关联迭代：v0.2（PRD 阶段 R4 **已定稿**；Developer 通过、Architect 通过·附条件、DevOps 通过·附条件）
+- 关联非迭代工作：无
+- 关联 Change Note：无（本轮附条件须由 PM 出 Change Note 处理）
+- 遗留问题/风险：① **附条件必须在设计阶段落定 O-3 前闭环**——AC-3.5 是 PRD 中唯一「被声明为正确性约束、却建立在未被保证的量上」的条款，实现阶段不得按 `N ≤ 8` 落地 ② 服务器部署环境 + 口令注入仍是本角色两项待办，且共同阻塞 C-6 实证与联调冒烟；建议与设计阶段并行推进 ③ 部署就绪检查的通过条件（v0.2 为「服务器上 worker 连库跑通闭环」，不同于 v0.1 的「本机 curl + 一次 POST」）仍待本角色在部署阶段定义 ④ 托管化顺延 v0.3，v0.2 只能人工看护灰度；`DefaultTimeoutStopSec` 90s 已登记为 v0.3 具体前置 ⑤ 单条 wall-clock 预算若落地，`news_l1.py:69` 的 `tool_budget_used`（当前只是**次数**预算）正好补上时间维度。
+- 下一步入口：PM 出 Change Note 处理两条附条件 + 转达 C-11~C-13；进设计阶段；本角色待 Owner 授权服务器访问后备环境 + 注入口令 + 执行 C-6 实证（6 步方案见 PRD §5）。
+- 收尾状态：已收尾
+
 ## 2026-07-27 — v0.2 PRD R3 DevOps 复审 + C-6 实证安排
 
 - 本次角色：DevOps

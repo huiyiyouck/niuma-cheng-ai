@@ -6,7 +6,8 @@
 
 - 当前迭代：v0.2（进行中，2026-07-25 范围重排：主线改为承接 REQ-003 数据库边界异步解耦）
 - 当前模式：标准迭代（进行中）
-- 当前阶段：v0.2 **PRD 阶段 — R4 复审中（Developer + Architect 已通过，DevOps 待复审）**（R1/R3 三方均未通过，R2 未经 Review 即被外部事实推进；R4 于 2026-07-27 按三方 R3 意见收敛，10 高 + 6 中低全部处置）
+- 当前阶段：v0.2 **PRD 阶段已定稿**（2026-07-27，R4 三方全部通过：Developer 通过；Architect 通过·附条件；DevOps 通过·附条件）→ **下一步进设计阶段**。R1/R3 三方均未通过，R2 未经 Review 即被外部事实推进；R4 按三方 R3 意见收敛，10 高 + 6 中低全部处置。
+- **两条附条件（均须在设计阶段开工前经 Change Note 补入，不阻塞定稿）**：① **Architect**：AC-9.4 黄金样本须补四类路径覆盖（正常 / 工具全失败降级 / 非法 JSON 容错 / 超时触发 provider fallback）；② **DevOps**：AC-3.5 的 `N ≤ 8` 须订正——实查 `RunOptions.timeout_ms` 默认 180000ms，`kb_search`/`web_search`/LLM 三段各吃满 180s（`ChainedAIClient(providers)` 未传 `budget_ms`，budget 退化为 `timeout_ms`），单条最坏约 **548s** 而非推导所用的 79s，`8 × 548s ≫ 1800s` 卡死阈值 → 必然误回收 + 双写竞态；须定义单条 wall-clock 预算或把 N 重算为 ≤ 3，**实现阶段不得按 `N ≤ 8` 落地**。该数字同时撑着 AC-5.7 宽限期下限与 AC-9.3 陈旧容忍上限，一并偏小。
 - **本项目核心开发原则（Owner 2026-07-26 定，优先于成本考量）**：以基础夯实、可扩展性强的方式开发，而不是图便捷；宁可现在多干活，也要让系统更健全、后期接入更友好。已写入 `v0.2-prd.md` §0，后续所有技术取舍按此裁定。三方 R3 均明确认可该准则的三处裁定。
 - 阻塞项：**无阻塞定稿项**。契约侧 4 条阻塞已于 2026-07-27 全闭、契约升至 **v1.4**；R3 三方 10 条高严重度全为增补型、已在 R4 处置完毕。
 - **前置待办（DevOps，已前移为「实现阶段开工前置」，不再排部署阶段）**：
@@ -16,8 +17,8 @@
 - **联调判读须知**：`score_total` 在 database 模式**没有触发点**（xiaobao 的 `calcScoreTotal` 只挂 HTTP 路径），ai 写回后该列保持 NULL → 新闻按分排序沉底、前端评分徽章显示 0。**这不是 ai 的缺陷**，xiaobao 已上报其 PM 补触发点。
 - **本迭代最大技术风险**：**async 改造的回归**（O-8，P0）。三方判断一致「风险在回归不在重写」。客观兜底已从开放问题提升为验收标准——**AC-9.4 黄金样本外部化**（改造前在 v0.1 基线录 `L1Output` JSON 快照，改造后同输入同 mock 重跑逐字段比对），因为约 21/36 例单测的 fake 必须随 async 改写，只靠单测自证属循环论证。
 - 待转达 xiaobao 3 条（均不阻塞，ai 已按明确假设实现）：**C-11** `tasks.priority` 方向语义、**C-12** 退避表长 3 < `max_attempts` 默认 5 且契约「最大 3」与 schema 默认 5 不一致、**C-13** `source_item_url` 是否保证带协议前缀 + 登记「`raw_item_id` 唯一约束是 ai 写回幂等前提」。另 C-6 待 ai 实证（**已有 fallback，不阻塞实现**）、Q-1 待对方 PM 表态。
-- **R4 复审进度**：**Developer 通过**（2 中 2 低）、**Architect 通过（附条件）**（1 高 3 中 3 低）、**DevOps 待复审**。两方均确认其 R3 意见已全部收敛（Architect 侧 8 条中 3 条被写得强于原建议）。**Architect 的附条件**：AC-9.4 的黄金样本须补**四类路径覆盖**（正常 / 工具全失败降级 / 非法 JSON 容错 / 超时触发 provider fallback），于**设计阶段开工前**由 PM 出 Change Note 补入——理由：§6/§8 均认定黄金样本是 O-8 这个 P0 风险的唯一客观兜底，而 async 回归极少出在正常路径（`asyncio.TimeoutError` 与 `httpx.TimeoutException` 不同类型，按类型分派的 error kind 会漏接），只录 happy path 则兜底只兜住一半。另 3 中：AC-3.7 fallback 行为订正（后到者本轮拿空批，非「阻塞后拿到其他行」；**v0.3 多实例前必须先解决 C-6**，须写进 §4 顺延项）+ **Developer 补的隔离级别前置**（fallback 仅在 `READ COMMITTED` 下正确，RR/SERIALIZABLE 会抛 `could not serialize access`）；AC-9.3 的 `worker_alive` 改三态 `running/stopping/dead`（二态无法表达「正在正常退出」，v0.3 托管层会在优雅停机期间判死重启）；AC-2.1 澄清恒等映射属真实实现。3 低：§6/§8 闭合计数应为 14 项、PRD §Review 状态表推进 R4（已自行更新本角色行）、流程提醒（R4 若再未通过按 baseline §9-10 须升「阻塞」交 Owner，不得直接出 R5）。
-- 下一步入口：① **DevOps 做 PRD R4 复审**（最后一方；Developer / Architect 已通过）；② PM 转达 C-11~C-13；③ DevOps 备服务器环境 + 注入口令 → 执行 C-6 实证（6 步方案见 PRD §5，全程事务内 `ROLLBACK` 不消耗 5 条预置队列；结论回帖归 PM）；④ R4 定稿后进设计阶段：O-2 协议按职责分层、O-6 事务与连接（连接不得跨 `await` 长持）、**O-8 async 切分与回归（P0）**、O-9 驱动选型（倾向 psycopg3 async）、O-10 `locked_by` 标识规则；⑤ 实现阶段按 §8 五块切片推进。
+- **R4 复审结果（三方齐·全部通过）**：**Developer 通过**（2 中 2 低）、**Architect 通过（附条件）**（1 高 3 中 3 低）、**DevOps 通过（附条件）**（1 高 1 中 1 低）。三方均确认其 R3 意见已全部收敛（Architect 侧 8 条中 3 条、DevOps 侧 5 条中 2 条被写得强于原建议）。**DevOps 另两条（非附条件）**：中——`worker_alive` 三态化后须写死 HTTP 状态码映射（`running`→200 / **`stopping`→200** / `dead`→非 200，建议 503），否则托管层探针判的是状态码而非响应体字段，`stopping` 落进非 200 会在优雅停机的 632s 窗口内被判死重启，Architect 三态化要避免的事原样发生；低——两项前置虽已前移，但未说何时启动，建议设计阶段开工时**并行**启动环境准备与 C-6 实证，实证结论可反哺 O-6 事务边界与 O-9 驱动选型。**Architect 的附条件**：AC-9.4 的黄金样本须补**四类路径覆盖**（正常 / 工具全失败降级 / 非法 JSON 容错 / 超时触发 provider fallback），于**设计阶段开工前**由 PM 出 Change Note 补入——理由：§6/§8 均认定黄金样本是 O-8 这个 P0 风险的唯一客观兜底，而 async 回归极少出在正常路径（`asyncio.TimeoutError` 与 `httpx.TimeoutException` 不同类型，按类型分派的 error kind 会漏接），只录 happy path 则兜底只兜住一半。另 3 中：AC-3.7 fallback 行为订正（后到者本轮拿空批，非「阻塞后拿到其他行」；**v0.3 多实例前必须先解决 C-6**，须写进 §4 顺延项）+ **Developer 补的隔离级别前置**（fallback 仅在 `READ COMMITTED` 下正确，RR/SERIALIZABLE 会抛 `could not serialize access`）；AC-9.3 的 `worker_alive` 改三态 `running/stopping/dead`（二态无法表达「正在正常退出」，v0.3 托管层会在优雅停机期间判死重启）；AC-2.1 澄清恒等映射属真实实现。3 低：§6/§8 闭合计数应为 14 项、PRD §Review 状态表推进 R4（已自行更新本角色行）、流程提醒（R4 若再未通过按 baseline §9-10 须升「阻塞」交 Owner，不得直接出 R5）。
+- 下一步入口：① **PM 出 Change Note 处理两条附条件**（Architect 的黄金样本四类路径 + DevOps 的 AC-3.5 `N` 值订正），须在设计阶段开工前完成；② PM 转达 C-11~C-13；③ **DevOps 备服务器环境 + 注入口令 → 执行 C-6 实证**（6 步方案见 PRD §5，全程事务内 `ROLLBACK` 不消耗 5 条预置队列；结论回帖归 PM）——建议与设计阶段**并行**启动，不必串行等待；④ **进设计阶段**（PRD R4 已定稿）：O-2 协议按职责分层、O-6 事务与连接（连接不得跨 `await` 长持）、**O-8 async 切分与回归（P0）**、O-9 驱动选型（倾向 psycopg3 async）、O-10 `locked_by` 标识规则；⑤ 实现阶段按 §8 五块切片推进。
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -30,7 +31,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
-| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R4 已出，待三方复审；无阻塞定稿项，契约 v1.4） |
+| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（**PRD R4 已定稿**，三方全部通过·两方附条件；下一步设计阶段。契约 v1.4） |
 | v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | [v0.1-summary.md](iterations/v0.1-summary.md) | 已关闭（2026-07-04，[自测报告](iterations/v0.1-test-report.md)） |
 
 ## 当前 Change Notes
