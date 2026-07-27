@@ -1,5 +1,22 @@
 # PM（产品经理）角色日志
 
+## 2026-07-27 — 会话摘要（PRD R3：xiaobao 三方答复全部闭合，ai 侧 3 处判断被推翻）
+
+- 本次角色：PM（产品经理，ck）
+- 动作：xiaobao PM / Architect / DevOps 于同日全部答复 ai 转达的契约缺项 → PM 核对契约 v1.3 → 出 PRD R3 → 回执 coordination。
+- **结果：原 4 条阻塞定稿项（C-2/C-3/C-5/C-10）全部闭合**。契约由 v1.1 连升 v1.2 → v1.3，DevOps 已执行 3 列 GRANT（`source_item_url`/`l0_label`/`run_after`，test + prod 双库对称）。10 条契约缺项闭合 9 条（C-6 待 ai 实证），6 条 Q 项闭合 5 条（Q-1 待对方 PM 表态）。**v0.2 PRD 已无阻塞定稿项。**
+- **ai 侧 3 处判断被推翻（本次最该记住的部分）**：
+  1. **C-3 写入方式**：ai 从触发器语义推断「ai INSERT」，逻辑正确但缺一条 ai 无从得知的**产品硬约束**——占位行用于 L0 通过后新闻立即可见。实际是 **ai UPDATE 占位行**。**教训：跨服务推断不能只从技术语义出发，涉及对方产品行为的必须问。**
+  2. **C-4 退避根因**：ai 判断「契约 claim SQL 缺时间条件」并计划自行用 `updated_at + backoff` 计算；实际根因是**对方 GRANT 少给 `run_after` 列**，其退避机制本就存在。**若按 ai 的错误根因实现，会与其 `requeueTask` 形成两套退避真源、卡死回收介入后漂移——这是被对方纠正避免掉的一次真实返工。** 现象推演完全正确、根因归错。
+  3. **Q-4 rss 无原文链接**：ai 依据对方 R-5 字段表得出否定结论并**已记为「已知限制」结案**；实际链接一直在 `raw_items.source_item_url` 列（R-5 只覆盖 `content` jsonb、未覆盖一级列）。**这条正是靠 Owner「没法确认的不能留成遗留、该沟通就沟通」原则才被翻出来的**——否则会带着错误限制进设计与实现。**教训：对方交付的结构说明可能有覆盖盲区，否定性结论（「确实没有」）要回问一次。**
+- R3 主要变更：AC-2.4 URL 改为三类源统一读 `source_item_url`（废弃 tweet_id 构造）；AC-3 claim 改以 `tasks` 为准 + 补 `run_after <= now()` + 明确不做孤儿探测；AC-4 改为 UPDATE 占位行（`INSERT ... ON CONFLICT DO UPDATE`）+ 字段表全部确定（`processing` / `'zh'` / NULL / **新增写 `published_at`** / 不写 `score_total` 与 `id`）；AC-5 退避改写 `tasks.run_after` 并**禁止自算**、上限改读 `tasks.max_attempts`**禁止硬编码 3**；AC-8 差异更新（`domain_tags` 改 `l0_label` 单值来源、**新增 `score_total` 在 DB 模式保持 NULL 的现象**）；§6 重写为闭合状态表 + 3 处被推翻判断的复盘。
+- **联调判读须知（已写进 PRD §5、AC-8.2、INDEX）**：`score_total` 在 database 模式无触发点（对方 `calcScoreTotal` 只挂 HTTP 路径），ai 写回后保持 NULL → 新闻排序沉底、评分徽章 0。**不是 ai 的缺陷**，对方已上报其 PM 补触发点。若无此提前告知，联调时几乎必然先怀疑自己的写回逻辑。
+- 对方交付质量记录（值得学）：把「纠正 3 条前提」放在答案之前、主动认领 2 条根因在己方、主动上报己方 3 项缺口、C-5 给「几乎必然但非原子」而非漂亮的「是」。
+- 关联迭代：v0.2（PRD 阶段，R3 待三方复审）
+- 遗留问题/风险：**O-8 async 改造的切分与回归策略仍是本迭代最大技术风险**；C-6 行锁实证待口令到位；Q-1 待对方 PM 表态；提醒对方契约升 v1.4（本轮 3 条前提错误均源于契约文本与实现分叉）。
+- 下一步入口：① 切 Architect / Developer / DevOps 做 R3 复审（不减方）；② Owner 交付 `ai_worker` 口令；③ R3 通过后进设计阶段。
+- 收尾状态：已收尾（2026-07-27，两仓已 commit/push）
+
 ## 2026-07-26 — 会话摘要（PRD R2：按三方 Review + Owner 核心原则重排）
 
 ### ⭐ Owner 核心开发原则（2026-07-26 定，长期有效，优先于成本考量）

@@ -6,11 +6,12 @@
 
 - 当前迭代：v0.2（进行中，2026-07-25 范围重排：主线改为承接 REQ-003 数据库边界异步解耦）
 - 当前模式：标准迭代（进行中）
-- 当前阶段：v0.2 **PRD 阶段 — R2 已出，待三方复审**（R1 三方均未通过；R2 于 2026-07-26 按三方意见 + Owner 核心原则修改完成）
+- 当前阶段：v0.2 **PRD 阶段 — R3 已出，待三方复审**（R1 三方均未通过；R2 未经 Review 即被 xiaobao 三方答复推进；R3 于 2026-07-27 按其答复收敛）
 - **本项目核心开发原则（Owner 2026-07-26 定，优先于成本考量）**：以基础夯实、可扩展性强的方式开发，而不是图便捷；宁可现在多干活，也要让系统更健全、后期接入更友好。依据：持续迭代产品，基础越牢后续可扩展越多。已写入 `v0.2-prd.md` §0，后续所有技术取舍按此裁定。
-- 阻塞项：① **契约缺项 C-1~C-10 待 xiaobao 补齐**，其中 **C-2（`tasks.status` 枚举无真源）/ C-3（`processed_news` INSERT vs UPDATE 未定）/ C-5（未承诺 AI 类入库必建 task，否则漏处理黑洞）/ C-10（`tags_v2` 第五类 `sentiment` vs `processing` 冲突）四条阻塞 PRD 定稿**；已由 PM 转达 coordination REQ-003。② **`ai_worker` 口令待 Owner 经安全渠道交付** —— ai 侧唯一剩余外部依赖（连接四要素已收：`127.0.0.1:5432` / `news_test` / `ai_worker`；口令存服务器 `/root/.secrets/ai_worker_news_test.pw`）。口令不到位不阻塞设计与实现，只阻塞联调冒烟。③ 测试环境需重建（DevOps R1 本机实查 `.env` 缺失、8100 无监听；Owner 指出环境在服务器上，该项待 DevOps 上服务器复核后订正）。
-- **已解除**：~~O-1 `score_total` 归属冲突~~（2026-07-25 xiaobao 定案方案 A、契约订正 v1.1，PRD R2 已落实）；~~DB 联调前置未就绪~~（2026-07-25 xiaobao DevOps 已建角色 + GRANT + 造数 5 条 + R-5 结构说明，实测验证通过）。
-- 下一步入口：① **切 Architect / Developer / DevOps 做 PRD R2 复审**（三方不减方——R2 的核心变更 async 地基改造直接推翻了 Developer R1 问题 2 的推荐解法，必须三方确认）；② Owner 交付 `ai_worker` 口令；③ xiaobao 回应 C-1~C-10（4 条阻塞定稿）；④ R2 通过后进设计阶段：Architect 落定 O-2 数据源协议边界、O-6 事务与连接、**O-8 async 改造的切分与回归策略（P0，本迭代最大技术风险）**、O-9 async DB 驱动选型；⑤ 实现阶段按 §8 五块切片推进。
+- 阻塞项：**无阻塞定稿项**。原 4 条（C-2/C-3/C-5/C-10）已于 2026-07-27 由 xiaobao 三方全部闭合，契约连升 v1.2→v1.3、3 列 GRANT 已双库执行。剩余两项均不阻塞：① **C-6 行锁可行性待 ai 侧实证**（拿到口令后在 `news_test` 实测 `SELECT ... FOR UPDATE` 在列级 GRANT 下是否可行；xiaobao 预判可能不满足，若失败其改授表级，结论须回帖）② **Q-1 `needs_context` 是否补列待 xiaobao PM 表态**（其 Architect 已倾向补列）。
+- **唯一外部依赖**：`ai_worker` 口令待 **Owner 经安全渠道交付**（连接四要素已收：`127.0.0.1:5432` / `news_test` / `ai_worker`；口令存服务器 `/root/.secrets/ai_worker_news_test.pw`）。不阻塞设计与实现，只阻塞联调冒烟与 C-6 实证。
+- **联调判读须知**：`score_total` 在 database 模式**没有触发点**（xiaobao 的 `calcScoreTotal` 只挂 HTTP 路径），ai 写回后该列保持 NULL → 新闻按分排序沉底、前端评分徽章显示 0。**这不是 ai 的缺陷**，xiaobao 已上报其 PM 补触发点。
+- 下一步入口：① **切 Architect / Developer / DevOps 做 PRD R3 复审**（三方不减方：Architect 复核 C-3 结论反转对设计的影响、Developer 复核 3 处被推翻判断的收敛、DevOps 接手 C-6 实证安排）；② Owner 交付口令；③ R3 通过后进设计阶段：O-2 数据源协议边界、O-6 事务与连接、**O-8 async 改造的切分与回归策略（P0，本迭代最大技术风险）**、O-9 async DB 驱动选型、O-10 `locked_by` 标识规则；④ 实现阶段按 §8 五块切片推进。
 
 > 当迭代激活后，`当前阶段` 必须写清楚具体状态，例如：
 > `设计阶段 — Review R2，Architect 等待 PM 和 Developer 反馈`
@@ -23,7 +24,7 @@
 
 | 版本 | 迭代记录 | PRD | UI | 设计文档 | Summary | 状态 |
 |------|----------|-----|----|----------|---------|------|
-| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R2 已出，待三方复审；主线 REQ-003 + async 地基） |
+| v0.2 | [v0.2.md](iterations/v0.2.md) | [v0.2-prd.md](iterations/v0.2-prd.md) | 纯后端（无界面） | — | — | 进行中（PRD R3 已出，待三方复审；4 条阻塞全闭，契约 v1.3） |
 | v0.1 | [v0.1.md](iterations/v0.1.md) | [v0.1-prd.md](iterations/v0.1-prd.md) | 纯后端（无界面） | [v0.1-design.md](iterations/v0.1-design.md) | [v0.1-summary.md](iterations/v0.1-summary.md) | 已关闭（2026-07-04，[自测报告](iterations/v0.1-test-report.md)） |
 
 ## 当前 Change Notes
