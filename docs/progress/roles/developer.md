@@ -1,5 +1,28 @@
 # Developer 角色日志
 
+## 2026-07-27 — v0.2 PRD R3 复审
+
+- 本次角色：Developer
+- 动作：Review（R3 三方复审第一交，Architect / DevOps 待做）
+- 涉及文档：`docs/progress/iterations/v0.2-prd.md`（追加 R3 Review 记录 + Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（PRD 门禁 + Review 记录）、`docs/progress/INDEX.md`；实查 `grep -rn "httpx\.(get|post|Client|AsyncClient)" src/`（全仓 4 处）、`grep -rn "\.invoke(" src/`、`tests/` fake 实现与用例分布
+- 结论：**PRD R3 Developer 复审未通过**（3 高 2 中 2 低）。**R1 六条已全部收敛到位**，本轮新问题**全部落在 R2/R3 新增的 async 范围内**，属补充而非推翻。
+  1. **R1 收敛复核（本轮指派任务）全部到位**：① `tags_v2` → C-10 定案 `processing` ② 同步/探活 → 改 async 地基，且我提的「处理中 ≥60s 时 `/health` 须 2s 内返回」被完整保留为 AC-9.3 ③ AC-7 三点全采纳（空条款已删、缺陷位置写明 graph 三处、三工具统一）④ AC-2/AC-8 判据已分开写死 ⑤ AC-2.4 保留 URL 回填要求与静默失效说明 ⑥ AC-4.6 逐字段表已确定。
+  2. **三处被推翻判断，我逐条确认接受**：C-3「ai UPDATE 占位行」——占位行是 xiaobao 产品硬约束，ai 从数据库语义推不出来，`ON CONFLICT DO UPDATE` 写法我逐条核过无坑；C-4 退避根因（我现象推演对、根因归错）；**Q-4「rss 无原文链接」是我的错且错法值得记**——我依据对方 R-5 字段表得出否定结论并已写成"已知限制"结案，而该表只覆盖 `content` jsonb、未覆盖一级列。**教训认领：对"对方确实没有某物"的否定结论，不能靠对方交付物的沉默证实，须回问一次。**
+  3. **高①HTTP 模式并发退化无验收覆盖**：PRD 在 US-8 背景里点出"同步端点靠线程池兜底"，但推论只写了一半——端点由 `def` 改 `async def` 后 FastAPI **不再派发线程池**，改造若有任一遗漏，HTTP 模式会从"线程池并发"退化为"event loop 串行"，**比 v0.1 更糟**；AC-1 说"与 v0.1 等价"却未界定等价维度，AC-9.3 只覆盖 DB 模式。需补对称的并发验收（N≥3 并发，总耗时 < 1.5×单条）。
+  4. **高②AC-9.4「行为不变」是循环论证**：实查 `test_news_l1.py:44` `FakeClient`、`:64-73` `NullTools`、`test_news_l1_tools.py:16` `FakeTools` 全为同步签名，协议改 async 后必须一并改写（约 21/36 例受影响，`TestClient`→`ASGITransport`），"用改写后的测试证明改写后代码行为不变"验不住，"断言语义不得放宽"不是可执行判据。需把 O-8 的"黄金样本快照"**提升进 AC-9.4** 作为验证方式写死（验收标准不能依赖尚未决定的方法）。
+  5. **高③AC-3.6 与 §5 时序冲突**：C-6 行锁实证要求"实现前"完成，口令注入却归部署阶段。xiaobao 已预判列级授权很可能不满足 `FOR UPDATE`，若推迟到部署阶段才失败，claim / 事务边界 / 并发测试全部返工（claim 是 worker 循环地基）。建议口令注入**前移为实现阶段开工前置**（§5 已简化为同机直读，成本极低）。
+  6. **中④§8 成本表未按 async 重估**：它沿用了我 R1 在**线程方案前提**下的"处理核心零改动"结论，async 下只对一半——解耦*方向*仍是红利（协议切点不挪），但*代码*要碰 4 个出网点 + `AIClient`/`NewsTools` 两协议 + `DefaultNewsTools` + 4 个 IO 节点 + `tasks.py:64` `invoke→ainvoke` + `run_task` + `main.py` 端点 + 过半单测，是全仓 IO 代码一次性翻新。会让 Architect 切分与 PM 排期低估。
+  7. **中⑤`l0_label` 空值兜底未写**：NULL/空串若直接包成 `[l0_label]` → `['']` 是**真值**，会穿过 `news_l1.py:206` 的 `or None` 把空标签传给 xiaobao KB 检索。需明确映射为 `[]`。
+  8. **低⑥⑦**：O-9 驱动选型建议 **psycopg3(async)** 而非 asyncpg（占位符 `%s` 便于 C-6 失败后改写 SQL、同步/async API 同构、对 v0.3 RunRecord 友好；asyncpg 性能优势在 74~79s LLM 瓶颈下无意义）；async 划线按"**有 IO 才 async**"（`ingest_context`/`normalize_output` 纯计算节点改 async 无收益，非图便捷）。
+  9. **工程成本重估（本轮指派任务）**：async 地基为**新增最大块**，其余四块持平或略增。**风险重心已从"契约缺项"转移到"async 回归"**——R1 时阻塞全是外部契约缺项（现闭合 9/10），R3 后 ai 侧最大不确定性是 async 回归；O-8 自评"风险在回归不在重写"准确，正因如此高②的黄金样本基线是该 P0 风险**唯一的客观兜底**。
+  10. **AC-9.1 的 IO 点清单经实查完全准确**：全仓 `httpx` 出网点有且仅有 PRD 所列四处，行号逐一对得上。
+- 关联迭代：v0.2
+- 关联非迭代工作：无
+- 关联 Change Note：无
+- 遗留问题/风险：① C-6 行锁实证若失败需 xiaobao 改授表级 GRANT，结论须回帖 coordination ② Q-1 `needs_context` 待 xiaobao PM 表态 ③ async 回归是本迭代最大技术风险，回归基线形式（黄金样本）需在 R4 或设计阶段落定 ④ §0 准则下"不图便捷"与"不做无谓改动"的边界需在设计阶段把握（问题 7）
+- 下一步入口：Architect / DevOps 完成 R3 复审 → PM 按三方意见改 R4（重点：补 HTTP 并发验收、黄金样本进 AC-9.4、口令注入前移）→ R4 定稿后进设计阶段（O-8 async 切分与回归策略、O-9 驱动选型、O-2 协议边界、O-6 事务边界）
+- 收尾状态：已收尾（复审交付完成）
+
 ## 2026-07-26 — v0.2 PRD R1 Review
 
 - 本次角色：Developer

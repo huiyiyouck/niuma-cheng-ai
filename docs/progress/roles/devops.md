@@ -1,5 +1,18 @@
 # DevOps 角色日志
 
+## 2026-07-27 — v0.2 PRD R3 DevOps 复审 + C-6 实证安排
+
+- 本次角色：DevOps
+- 动作：Review（PRD R3 复审 · 运行形态 / 探活与优雅停机 / 凭据注入 / async 后的部署形态）+ 接手 C-6 行锁实证执行安排；另代收并提交了此前滞留工作区的两方 R1 Review 产出（`b8fc087`）
+- 涉及文档：`docs/progress/iterations/v0.2-prd.md`（追加 §R3 DevOps 复审 + 订正 Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（阶段门禁 R3 行 + Review 记录表）、`docs/progress/INDEX.md`（当前阶段 / 外部依赖两项 / 下一步入口）；实查 `uname -s`（**Darwin**）、`ls -d /root`（**不存在**）、`ls .env`（**不存在**）、`lsof 8100/8001/5432`（**均无监听**）、`ls scripts/ deploy/`（**均不存在**）、`.gitignore` / `requirements.txt` / `.env.example` / `src/agent_hub/{config,main}.py`
+- 结论：**未通过**（3 高 2 中，需 PM 修改后 R4）。**R1 七条已全部收敛**，其中 3 条被 PM 写得强于原建议（AC-9.3 抗阻塞探活断言 / AC-6.2 错误口令验证法 / AC-5.7 优雅停机验证法）。本轮新问题：高①**§5「唯一剩余外部依赖是口令」不成立** —— 三条实查事实（本机 macOS 无 `/root`、`5432` 无监听、v0.1 全程本机）指向 PRD 说的「同机」是一台 Linux 服务器，即 ai 运行位置要从开发机迁过去，而该部署环境整块缺失，AC-3.6 的 C-6 实证当前不可执行；高②**AC-5.7 宽限期只有上限没有下限、未覆盖 ASGI 与托管层** —— 单批 N≤8 串行最坏 632s，配 90s 完全"合规"却必然中途强杀，systemd 默认 `TimeoutStopSec` 90s 会让 v0.3 托管化当天优雅停机失效；高③**回滚被写成 ai 单方"改配置重启"，实为双侧协同且有顺序** —— DB 模式下 xiaobao 不再发 HTTP，ai 单方切回会让队列静默积压，比不回滚更糟。中④`last_poll_at` 无陈旧阈值（整批处理 632s 内不更新，健康与卡死表现相同）；中⑤同机直读引入**口令副本漂移**（两份、无同步、无热加载）且 root 授权形式未定。
+- 关联迭代：v0.2（PRD 阶段 R3，Review中；Developer 同日亦判未通过，Architect 待复审）
+- 关联非迭代工作：无
+- 关联 Change Note：无
+- 遗留问题/风险：① **服务器部署环境是当前最大运维缺口**——不解决则 C-6 实证、联调冒烟、部署就绪检查全部无从谈起，且 v0.2 至今没有部署就绪检查的定义 ② C-6 实证方案已备好（6 步、事务内 `ROLLBACK`），只等环境 + 口令；xiaobao 预判列级 GRANT 可能不满足 `FOR UPDATE`，若失败其改授表级 ③ 实证纪律：`news_test` 仅 5 条预置 `queued`，实证绝不能把任何一条推进到 `running`，否则自测样本减少 ④ 结论回帖 coordination 归 PM，跨仓 `communications/` 写入不在本角色权限内 ⑤ 托管化仍顺延 v0.3，v0.2 只能人工看护灰度、不得无人值守（§4 已写明）
+- 下一步入口：Architect 补做 R3 复审（最后一方）；PM 按两方意见出 R4（DevOps 侧三条必改见上）；本角色待 Owner 授权服务器访问后，备部署环境 + 注入口令 + 执行 C-6 实证。
+- 收尾状态：已收尾
+
 ## 2026-07-25 — v0.2 PRD R1 DevOps Review（主线 REQ-003）
 
 - 本次角色：DevOps
