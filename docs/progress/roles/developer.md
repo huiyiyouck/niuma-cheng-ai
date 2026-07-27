@@ -1,5 +1,25 @@
 # Developer 角色日志
 
+## 2026-07-27 — v0.2 PRD R4 复审（通过）
+
+- 本次角色：Developer
+- 动作：Review（R4 三方复审第一交；Architect 随后通过·附条件，DevOps 待做）
+- 涉及文档：`docs/progress/iterations/v0.2-prd.md`（追加 R4 Review 记录 + Review 状态表本角色行推进至 R4）、`docs/progress/iterations/v0.2.md`（PRD 门禁 + Review 记录）；实查 `tools/link_reader.py:23`、`tools/base.py:50`、`graphs/news_l1.py:121/142/269/407` 的 URL 判定链路
+- 结论：**PRD R4 Developer 复审通过**（2 中 2 低，均不阻塞定稿）。
+  1. **R1 六条 + R3 七条已全部收敛**，其中 5 条逐字采纳：AC-9.5（HTTP 并发不退化，N≥3 总耗时 <1.5× 单条）、AC-9.4（黄金样本外部化写死，连"为什么不能只靠单测"的论证与 21/36 例实查数据一并收进）、AC-8.2（`l0_label` 空值兜底为 `[]`）、O-9（psycopg3(async)，Architect 采纳）、§5（部署环境 + 口令双待办前移为实现阶段开工前置）。
+  2. **认领一处订正**：AC-2.4 的 URL 判定落点我 R1/R3 两轮都引错。实查确认——`_should_link_read`（`:269`）走 `tools.extract_url` → `base.py:50` → **`link_reader.py:23`**（额外要求 `http(s)://` 前缀），而我引用的 `news_l1.py:407` `_extract_url` **只被 `:121` `ingest_context_node` 用**、不检查前缀。结论方向（不回填 URL 键则 link_read 静默失效）成立，但落点指错，**且我没发现两处判定不一致**——Architect 的发现比我原问题更深一层。R4 的规范化处置（统一为带前缀、三例验证）充分。
+  3. **O-8 还订正了我的 async 划线说法**：判据应为「无 IO **且耗时为毫秒级**」，而非我说的"有 IO 才 async"——同步节点在协程中被直接执行、其耗时会占用 event loop，将来纯计算节点变重必须移出。订正准确，接受。
+  4. **中①AC-3.7 的 fallback 隐式依赖 READ COMMITTED**：「UPDATE 阻塞→重新求值→`status='queued'` 不成立故排除」只在 READ COMMITTED（PG 默认）下成立，REPEATABLE READ 及以上会抛 `could not serialize access` 而非安全跳过；且其并发语义与 `SKIP LOCKED` 不等价——并发 worker 的子查询是快照读、会选出同一批 id，第二个拿 **0 行**而非"另外 N 条"，v0.3 多实例时吞吐受限。建议补隔离级别约束 + 登记已知限制（并入设计阶段 O-6/O-9）。**Architect 独立确认了这条，并补充「v0.3 多实例前必须先解决 C-6」应写进 §4 顺延项。**
+  5. **中②AC-2.2 判据前半句是同义反复**：「同一份处理核心……代码完全相同」只要不复制成两份必然成立，不可证伪；有牙齿的是后半句（核心内不得出现表名/列名/`raw_items`·`tasks` 概念）。建议拆为①静态（对 `tasks.py`/`graphs/`/`llm/` grep 数据源概念词，可自动化）②动态（两条控制流各跑通一条真实用例）。
+  6. **低③**Review 状态表未推进到 R4（三方状态仍是 R3 结论）；**低④**单测分母口径不一（AC-9.4 写 40、§8 与实查为 36，应以 `pytest --collect-only` 实收集数统一）。
+  7. **成本表复核（本轮指派）**：§8 的 R4 重写准确、可直接用于设计切分——「仍成立的红利（依赖方向）/ 已不成立的（代码零改动）」拆分消除了我 R3 指出的误导，五块表改动面与我实查一致。**块 4 风险由「中（依赖 C-2/C-5/C-6）」降为「中（C-6 已有 fallback）」确认成立**：fallback 只需列级 UPDATE 权限、不触发 `FOR UPDATE` 的表级权限检查，C-6 不再决定 claim 地基形态，只决定用哪种写法——这解除了我 R3 高③里「claim 是 worker 循环地基、返工代价大」的那一半担忧。
+- 关联迭代：v0.2
+- 关联非迭代工作：无
+- 关联 Change Note：无（Architect 的附条件「黄金样本四类路径覆盖」将由 PM 出 Change Note，与我 AC-9.4 的意见同源、方向一致，我认可其加严）
+- 遗留问题/风险：① 中①中② 建议若不在定稿前订正，须在设计阶段 O-6/O-9 落定时一并处理 ② C-6 实证仍待服务器环境 + 口令到位（已有 fallback，不阻塞实现）③ 单测分母口径需在实现阶段以实收集数确认
+- 下一步入口：DevOps 完成 R4 复审 → 三方齐后 PRD 定稿（Architect 附条件的 Change Note 须于设计阶段开工前落地）→ 设计阶段（O-2 协议按职责分层 / O-6 事务与连接含隔离级别 / O-8 async 切分与回归 P0 / O-9 驱动选型 / O-10 `locked_by` 规则）
+- 收尾状态：已收尾（复审交付完成）
+
 ## 2026-07-27 — v0.2 PRD R3 复审
 
 - 本次角色：Developer

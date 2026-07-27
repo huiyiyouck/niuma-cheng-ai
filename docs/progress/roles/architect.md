@@ -1,5 +1,35 @@
 # Architect 角色日志
 
+## 2026-07-27 — v0.2 PRD R4 复审（Architect）
+- 本次角色：Architect（架构师）
+- 动作：标准迭代 PRD 阶段 R4 复审（Developer 同日已复审并**通过**；DevOps 待复审）
+- 涉及文档：`docs/progress/iterations/v0.2-prd.md`（追加 §Review 记录 · R4 — Architect 复审 + 同日订正段 + 本角色 Review 状态行推进至 R4）、`docs/progress/iterations/v0.2.md`（R4 门禁行 + Review 记录表）、`docs/progress/INDEX.md`（当前阶段 / R4 复审进度 / 下一步入口）
+- 结论：**通过（附条件）** —— 1 高 3 中 3 低，**无阻塞级**
+- **R3 我方八条全部收敛，其中 3 条被写得强于原建议**：AC-5.2 越界行为写成了可执行测试断言（我只要求定义行为）；AC-9.3 把我的 `worker_alive` 与 DevOps 的在途进度合并成三重探活并写明分工；AC-2.1 把「HTTP 不实现、也不假装实现」写进正文堵死空实现（我只说了分层）
+- 本轮高①：**AC-9.4 黄金样本未定义覆盖路径**——方法论正确（回归判据外部化，解了循环论证），但「若干组」不约束覆盖面，而 §6/§8 均认定它是 O-8 这个 P0 风险的**唯一客观兜底**。同步转 async 的回归极少出在正常路径（改错单测立刻红），集中在异常路径：`asyncio.wait_for` 抛 `asyncio.TimeoutError` 而非 `httpx.TimeoutException`（`llm/client.py` 的 error kind 按类型分派会漏接 → 降级语义与 `error_kind` 一起失真）、provider fallback 链、工具全失败降级、非法 JSON 容错——这四类正是 v0.1 花整个迭代调稳、且 DB 模式唯一观测面所依赖的。须补四类路径覆盖要求（成本极低，不依赖服务器环境，改造前就能录）
+- 三中：②**AC-3.7 fallback 行为描述不准（我 R3 引入、PM 照抄，已认领）**——子查询无 `SKIP LOCKED`，两 worker 选出同一批 id，后到者本轮**拿空批**而非「阻塞后拿到其他行」→ fallback 是 v0.2 单实例专用，**v0.3 多实例前必须先解决 C-6**，须写进 §4 顺延项（写在 O-6/O-9 会被遗忘）③**AC-5.7 与 AC-9.3 在「停机中」互相打架**——worker task 正常收尾结束时 `worker_alive`=false → `/health` 非 200 → v0.3 托管层判死重启正在正常退出的进程；二态无法表达 `stopping`，须改三态 `running/stopping/dead`，仅 `dead` 返非 200 ④AC-2.1「不得有空方法」需澄清恒等映射属真实实现（HTTP 侧 `to_l1_input` 天然 identity）
+- 三低：⑤§6「已闭合 12 项」计数错（实为 14 项 /13 行，`C-1/Q-5` 合并计），§8「12/13」同 ⑥PRD §Review 状态表未推进 R4（已自行更新本角色行）⑦流程提醒：R4 若再未通过，按 `standard-iteration-quick.md` §9-10 应升「阻塞」交 Owner，不得直接出 R5（本迭代实际 Review 轮次为 R1/R3/R4 三轮，R2 未经 Review 作废不计，故走到 R4 不违规）
+- **同日订正（与 Developer 的交叉）**：我的中②与其 R4 中①是同一处，**其补充更深**——fallback 的正确性**只在 `READ COMMITTED` 下成立**（依赖 PG 的 EvalPlanQual 重新求值；RR/SERIALIZABLE 下直接抛 `could not serialize access due to concurrent update`，claim 报错而非安全拿空批）。该前置条件记在 Developer 名下，比我那条更关键（我的影响 v0.3 吞吐，他的影响正确性）。另接受其中②对 AC-2.2 的改进：我给的「同一核心接两条真实控制流」解决了空实现问题，但「核心代码完全相同」缺可证伪性，应按他的拆法改为 grep 静态判据（断言 `tasks.py`/`graphs/`/`llm/` 不命中数据源概念词）+ 动态跑通两条；其低④（单测分母 40 vs 36 口径不一致）我未注意到，确认成立
+- **判通过的理由**：本轮问题无一阻塞级；高①属补验证细节，`standard-iteration-quick.md` §11 的「轻量变更 → Change Note」正好适用，不必回阶段重走轮次；中②责任在我且不影响 v0.2 范围内的正确性。契约侧阻塞已全清（4 条闭合、契约 v1.4）、三方 R3 的 10 条高已全部处置、设计阶段要落的 O-2/O-6/O-8/O-9/O-10 均已有明确方向——**剩余条目在设计阶段承接的成本低于再走一轮 PRD 轮次**
+- 附条件（须于设计阶段开工前由 PM 出 Change Note）：1 黄金样本四类路径覆盖（高）2 AC-3.7 fallback 三件事（行为订正 + 隔离级别前置 + 多实例已知限制）3 `worker_alive` 改三态 4 恒等映射澄清 5 计数与状态表订正
+- 遗留问题/风险：DevOps R4 复审未交，PRD 尚未定稿；本会话仍未写 coordination（C-11~C-13 转达归 PM）
+- 下一步入口：DevOps 做 R4 复审（最后一方）；三方齐后 PM 出 Change Note 处置附条件并定稿；定稿后 Architect 创建 `v0.2-design.md`，优先落 O-2 协议分层与 O-8 async 切分（与 Developer 共同）
+
+## 2026-07-27 — v0.2 PRD R3 复审（Architect）
+- 本次角色：Architect（架构师）
+- 动作：标准迭代 PRD 阶段 R3 复审（三方复审最后一方；Developer / DevOps 同日已交，均未通过）
+- 涉及文档：`docs/progress/iterations/v0.2-prd.md`（追加 §Review 记录 · R3 — Architect 复审 + 订正 Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（R3 行 + Review 记录表）、`docs/progress/INDEX.md`（当前阶段 / 下一步入口 / 版本列表）；实读 coordination `contracts/news-l1-db.md`（**实读为 v1.4**，PRD 仍写「待升 v1.4」）、本项目 `graphs/news_l1.py`、`tools/{base,kb,link_reader}.py`、`llm/prompts.py`、`{main,tasks,schemas}.py`；**xiaobao 侧只读核证** `docs/progress/iterations/v0.6.1-design.md:275-300,357`、`server/src/db/schema.ts:195-215,250-277`
+- 结论：**未通过**（4 高 2 中 2 低，需 PM 出 R4）
+- **指派任务①：C-3 反转复核 —— 确认成立，且不依赖对方答复独立核证**：实读 xiaobao `v0.6.1-design.md:357`「推荐方案①：AI 类入库创建占位 `processed_news`，ai_worker 完成后 UPDATE 覆盖」、`schema.ts:202-205` `raw_item_id` 确有 `.notNull().unique()` + 外键、`:201` `id defaultRandom()` —— 三处均与其答复一致。**对设计的影响结论：几乎没有**（不改三段式事务、不改协议出向形状、幂等键仍是 `raw_item_id`），唯一实质变化是**写回幂等性的来源从「ai 自己的 upsert」变为「依赖对方 schema 的唯一约束」**，须作为跨服务依赖登记（C-13）
+- 本轮四条高（两方均未触及，全在架构职责内）：①**AC-2.1 的四操作协议对 HTTP 模式退化**——「推」（端点被动接收）与「拉」（worker 主动取批）控制流方向相反，HTTP 数据源会有 2~3 个空方法，而 AC-2.2「切换时核心 diff 为空」**能被一组空实现通过**，与 §0 裁定 2 的意图相反；应按职责分层（映射协议两侧真实实现 / 拉取协议仅 pull 型实现），判据改为「同一核心接两条真实控制流」 ②**claim 排序在 R1→R3 演进中整条丢失**——R1 的「按 `published_at` 升序」随「改为只查 tasks」失去载体后无人补替代，现 AC-3 无任何取件顺序：FIFO 消失 + `tasks.priority`（`schema.ts:262`，队列索引 `ix_tasks_queue(status, run_after, priority)` 明示预期访问模式）被完全无视 ③**退避数组长 3 < `tasks.max_attempts` schema 默认 5**（`schema.ts:265`）→ 第 4/5 次重试 `backoff(attempt)` 越界，静默退化即回到 C-4 刚修好的「立刻重领」；契约 §task type「最大 3」与 schema 默认 5 亦仍不一致 ④**AC-9.3 的 `/health` 200 可能是假信号**——async 下 worker 若为 `asyncio.create_task`，未捕获异常被静默吞掉（仅 gc 时打 `Task exception was never retrieved`），worker 已死而进程/HTTP/`mode` 全正常；需顶层捕获 + `worker_alive` + 已死时返回非 200
+- 两条中：⑤**AC-2.4 函数引用指错，该错由我 R1 引入、PM 照抄，已认领**——决定 `link_read` 触发的是 `tools/link_reader.py:23`（**额外要求 `http(s)://` 前缀**）而非 `news_l1.py:407`（不检查前缀）；`source_item_url` 若无协议前缀 → link_read 静默不触发但 context 仍填该 url，两函数判定不一致，且 AC-2.4 给的验证方式会因此不稳定 ⑥`tasks.raw_item_id` **nullable**（`schema.ts:258`），claim SQL 补 `AND raw_item_id IS NOT NULL`（避免 ai 领走后把不属于自己的任务标 failed）
+- **降风险附项（本轮最有价值的一条）**：给出 C-6 失败时**不依赖 `FOR UPDATE`** 的条件式原子 claim —— `UPDATE ... WHERE id IN (SELECT ... LIMIT N) AND status='queued' RETURNING`，并发时第二个事务阻塞等待、提交后重新求值 WHERE 而被排除，**不重复领取**；只需列级 UPDATE 权限，不触发 `FOR UPDATE` 的表级权限检查。代价是并发退化为阻塞而非跳过，claim 事务毫秒级 + v0.2 单实例下可忽略。**C-6 因此从「worker 地基可能返工」降为「两种写法二选一」**
+- 其余指派任务结论：**O-2** 协议按职责分层、不按模式对称；**O-6** 三段式确认无修改，补「async 下连接须随事务获取释放、不得跨 `await` 长持」（否则 8×79s≈632s 的长持会同时踩 idle-in-transaction 与连接池饥饿，三段式作废），连接池 2~3 即可；**O-8** 确认 Developer「有 IO 才 async」成立但判据订正为「无 IO **且毫秒级**」（LangGraph 同步节点在协程中直接执行、占用 loop）；**O-9** 采纳 psycopg3(async)，补架构理由（claim SQL 若需在两种写法间迁移，`%s` + 标准 DBAPI 成本最低）
+- 新增契约缺项 C-11（`priority` 方向语义）/ C-12（退避表长度 + 契约与 schema 的 3 vs 5）/ C-13（`source_item_url` 格式 + 幂等依赖登记），均 P1/P2 不阻塞，待 PM 转达
+- 与两方的关系：不重复其任何一条；Developer 高③（C-6 时序）与 DevOps 高①（部署环境）已合并，我的 fallback 降低了前者的返工风险，但环境前移仍须做（DevOps 的理由不止 C-6）；我的高④与 DevOps 中④互补（其字段答「卡没卡住」，我这条答「还在不在」）
+- 遗留问题/风险：本会话**仍未写 coordination**（C-11~C-13 转达归 PM，与 R1 同口径）；三方均未通过，PRD 待 R4；R4 定稿后我进设计阶段出 `v0.2-design.md`
+- 下一步入口：PM 出 R4（三方共 10 条高严重度，全为增补型）；R4 定稿后 Architect 创建设计文档，优先落 O-2 协议分层与 O-8 async 切分（与 Developer 共同）
+
 ## 2026-07-25 — v0.2 PRD R1 Review（Architect）
 - 本次角色：Architect（架构师）
 - 动作：标准迭代 PRD 阶段 R1 Review（v0.2 范围重排后的重写版，主线 REQ-003）
