@@ -48,6 +48,8 @@
 - **[P0]** 标注 AI 协作信息的 commit，push 前贴 `git diff --stat` 核对；与 message 范围不符则停等 Owner。
 - **[P0]** Review 阶段不得改产出正文，只能追加 Review 章节。
 - **[P0]** 未初始化项目须用户确认才能 Bootstrap 写入文件。
+- **[P0]** 阶段推进唯一依据 = 约定名门禁 `l1-gates` 在当前 commit 的**绿灯结论**；绿灯以外（红 / 未跑 / 进行中 / 查不到 / 无该 workflow）**一律不自动推进**，退回 Owner 确认并在迭代记录登记降级留痕；不得以任何理由绕过 CI。本条 **fail-closed**——与 corrections 缺失视为空、无 coordination 降级登记两处 fail-open 条文方向相反，勿类推。
+- **[P0]** 生产发布放行属对外不可逆动作（A4），须 Owner 明示放行；关闭检查机器化不构成发布授权。
 - **[P0]** 基线修正只能写 `BCR-###` 入 coordination 基线修正提案池，不在下游项目直接改 `baseline/`。
 - **[P0]** 跨仓写入：写 coordination 协调仓前先确认仓位置（按发现机制，不猜路径）+ git 同步状态 + 改动范围；只写跨项目事实，**不在 A 项目会话改 B 项目 `docs/progress/`**（详见 `cross-project-collaboration.md`）。
 - **[P1]** 机制（Bootstrap / 收尾 / 关闭 / 审计）不得代写其他角色结论或角色日志；禁止直接改他人角色日志。
