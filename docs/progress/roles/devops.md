@@ -1,5 +1,18 @@
 # DevOps 角色日志
 
+## 2026-07-28 — 服务器部署环境准备 + `ai_worker` 口令注入（v0.2 实现阶段开工前置）
+
+- 本次角色：DevOps
+- 动作：Ops Task（部署环境准备 / 凭据注入 / 连库与权限边界验证）
+- 涉及文档：`docs/progress/ad-hoc/2026-07-28-ops-server-env-and-credential.md`（本次运维记录，含完整证据）、`docs/progress/INDEX.md`
+- 结论：**两项前置均已完成**。目标机定位为 **`zijie` / 115.191.43.79**（`dig news.huiyiyou.cloud` 得，Ubuntu 24.04，PG 在 `127.0.0.1:5432`，Python 3.12.3）；ai 部署到 **`/opt/niuma-cheng-ai`**（与 `/opt/news-aggregator`、`/opt/workboard-prod` 同级），clone + venv + 依赖完成，`PYTHONPATH=src pytest -q` **40 passed**，与 v0.1 基线一致。口令按 O-7 **拆字段**注入 `/opt/niuma-cheng-ai/.env`（`chmod 600`、`.gitignore:5` 覆盖、`git status` 0 次命中、28 字符与源文件一致、**全程未回显未落日志**）。以 `ai_worker` 实连 `news_test` 六项验证全过：身份正确 / 读授权列 5 条 queued / 读 v1.3 新 GRANT 两列 154 条 / 读 tasks / 越权读 `alerts` 拒绝 / 越权写 `raw_items.process_type` 拒绝——**权限矩阵与契约 v1.4 一致**。
+- 关联迭代：v0.2（实现阶段开工前置；PRD R4 已定稿，设计阶段进行中）
+- 关联非迭代工作：本次 ad-hoc
+- 关联 Change Note：无（发现 A/B 若确认需改 AC-8.2，由 PM 判定是否走 CN）
+- 遗留问题/风险：① **发现 A（阻塞级）`tasks` 表 `l1_ai_process` 记录数为 0**，而 `raw_items` 有 5 条 `queued`——按 AC-3.1「只 claim tasks 不扫 raw_items」，预置数据永远领不到；**直接阻塞 C-6 实证**（实证 SQL 返回 0 行时 `FOR UPDATE` 权限检查根本不触发，会得到假的「通过」），且 worker 上线会静默空转。非 C-5 的毫秒窗口，是造数脚本只造 `raw_items` 未造配套 task。需 PM 转达 xiaobao 补建/修脚本，并顺带确认 type 字面量是 `l1_ai_process` 还是既有的 `l1_process` ② **发现 B（高）`l0_label` 真实数据只有 `direct_display` 一个取值**（test 154 条全是它；生产 637 条 + 120 NULL，同样无第二个非空值）——它是**流程标记**不是领域分类，PRD C-1「不再恒空」与 AC-8.2「语义近似」被实测推翻；`domain_tags` 会恒为 `['direct_display']`，且因是真值会穿过 `news_l1.py:206` 的 `or None`，把噪声塞进 prompt 与 KB 查询，**比恒空更糟**。建议适配层把 `direct_display` 视同无分类映射为 `[]` ③ **LLM 凭据缺失**：`.env` 中 LLM/Tavily/KB token 留空待 Owner 提供，不影响 C-6（纯 SQL）但阻塞任何真实冒烟；本次未擅自跨项目取用 openclaw 的 key ④ **PRD §5「`.env` 应在仓外」与 `config.py:16` 无参 `load_dotenv()` 冲突**，本次按 v0.1 做法放仓内（gitignore + 600 覆盖风险），建议 PRD 订正措辞或实现阶段引入 `ENV_FILE` 变量 ⑤ **安全观察**：ai DevOps 在该机为 root 登录，PRD §5「授权二选一/不给全量 sudo」在当前配置下不适用，最小权限未满足（既有运维方式，非本次引入）⑥ 实测印证 C-12：`tasks.max_attempts=5`、`priority=100`，契约「最大 3」确与 schema 默认不一致，AC-5.1「读列禁硬编码」方向正确。
+- 下一步入口：PM 转达发现 A / B 给 xiaobao；发现 A 闭合后执行 AC-3.7 的 6 步 C-6 实证（若短期拿不到，可做降级版行锁权限探测但须在回帖写明是降级结论）；Owner 提供 LLM 凭据后做真实处理冒烟。
+- 收尾状态：已收尾
+
 ## 2026-07-27 — v0.2 PRD R4 DevOps 复审（PRD 定稿）
 
 - 本次角色：DevOps
