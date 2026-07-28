@@ -1,0 +1,57 @@
+# niuma-cheng-ai · HTTP 模式服务（模板 unit，实例名 = 环境名，如 niuma-ai-http@test）
+#
+# 与 niuma-ai-worker@.service 同构，三处刻意不同（见下方标注）。
+# 双 unit 而非单 unit + 变量：AC-1.4 要求进程级开关，灰度期需要
+# 「停 worker、只留 HTTP 探活面」这类独立操作。
+
+[Unit]
+Description=Niuma AI HTTP (%i) — news-l1 HTTP mode
+Documentation=https://github.com/huiyiyouck/niuma-cheng-ai
+After=network-online.target postgresql.service
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=niuma-ai
+Group=niuma-ai
+WorkingDirectory=/srv/niuma-ai/%i
+
+EnvironmentFile=/srv/niuma-ai/%i/systemd.env
+Environment=PYTHONPATH=/srv/niuma-ai/%i/src
+Environment=PYTHONUNBUFFERED=1
+# 差异 1/3：模式为 http
+Environment=RUN_MODE=http
+
+ExecStart=/srv/niuma-ai/%i/.venv/bin/uvicorn agent_hub.main:app --host 127.0.0.1 --port ${PORT}
+
+KillSignal=SIGTERM
+# 差异 2/3：HTTP 模式不持有数据库锁，无「停机制造残留锁」问题，
+# 无需 worker 的 280s；90s 足够放完在途请求。
+TimeoutStopSec=90
+KillMode=mixed
+
+# 差异 3/3：HTTP 是无状态服务，尽快恢复可用性优先，用 always。
+# （worker 用 on-failure，因为优雅停机后的正常退出不该被拉起。）
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=niuma-ai-http-%i
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/niuma-ai/%i
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

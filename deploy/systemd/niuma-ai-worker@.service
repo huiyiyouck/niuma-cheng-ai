@@ -1,0 +1,77 @@
+# niuma-cheng-ai · DB 模式 worker（模板 unit，实例名 = 环境名，如 niuma-ai-worker@test）
+#
+# 安装：
+#   cp deploy/systemd/niuma-ai-worker@.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now niuma-ai-worker@test
+#
+# 每一项非默认配置都对应一个已知会出事的点，改动前请读注释。
+
+[Unit]
+Description=Niuma AI Worker (%i) — news-l1 DB mode
+Documentation=https://github.com/huiyiyouck/niuma-cheng-ai
+# network.target 只表示网络栈已启动、不保证网络可用；worker 启动即连 DB 与外部 LLM API
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+# 崩溃循环会反复 claim 并反复制造残留 processing 锁。
+# 单条处理预算 240s（ADR-0004），故窗口取 300s 而非 xiaobao 的 60s。
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=niuma-ai
+Group=niuma-ai
+WorkingDirectory=/srv/niuma-ai/%i
+
+# PORT 由各环境的 systemd.env 提供（只放简单值，不放 JSON——systemd 的
+# EnvironmentFile 解析不了 LLM_PROVIDERS_JSON 里的嵌套引号）。
+# 应用配置与凭据仍走 WorkingDirectory 下的 .env，由 config.py 的 load_dotenv() 读取。
+EnvironmentFile=/srv/niuma-ai/%i/systemd.env
+Environment=PYTHONPATH=/srv/niuma-ai/%i/src
+Environment=PYTHONUNBUFFERED=1
+# load_dotenv() 默认 override=False，故此处注入的 RUN_MODE 优先于 .env——
+# 由 unit 决定进程跑哪种模式，对应 AC-1.4 的进程级开关。
+Environment=RUN_MODE=db
+
+ExecStart=/srv/niuma-ai/%i/.venv/bin/uvicorn agent_hub.main:app --host 127.0.0.1 --port ${PORT}
+
+# ============ 优雅停机（本 unit 最关键的一段） ============
+# ADR-0004 定应用层宽限期 260s（单条 wall-clock 预算 240s + 余量）。
+# systemd 的 DefaultTimeoutStopSec 通常为 90s——若不显式覆盖，优雅停机每次
+# 都会在处理中途被 SIGKILL，留下 l1_status='processing' 的残留锁，
+# 使这批条目只能等 xiaobao 侧 1800s 卡死回收，每条延迟 ≥30 分钟。
+KillSignal=SIGTERM
+TimeoutStopSec=280
+KillMode=mixed
+
+# on-failure 而非 always：优雅停机后 worker 正常退出（exit 0），
+# always 会立刻把它拉起来重新 claim。这条影响正确性，不是策略偏好。
+Restart=on-failure
+RestartSec=10
+
+# ============ 日志 ============
+# 用 journal 而非 append 到文件：journald 自带轮转与配额。
+# 参照反例：xiaobao 的 /var/log/niuma-news-api.log 已 13M 且无 logrotate 配置，
+# 而 ai 是 7×24 轮询 worker，日志量远大于按请求触发的 HTTP 服务。
+# 对应 AC-6.3「日志统一输出到 stdout，由托管层收集」——journal 即该托管层。
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=niuma-ai-worker-%i
+
+# ============ 安全加固 ============
+# ai 只需：读运行目录、读自己的 .env、连本机 5432、出网调 LLM。不需要 root。
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/niuma-ai/%i
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
