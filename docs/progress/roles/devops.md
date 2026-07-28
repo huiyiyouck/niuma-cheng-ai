@@ -1,16 +1,20 @@
 # DevOps 角色日志
 
-## 2026-07-28 — 服务器部署环境准备 + `ai_worker` 口令注入（v0.2 实现阶段开工前置）
+## 2026-07-28 — 服务器部署环境准备 + 口令注入 + **事实订正** + v0.2 部署方案
 
 - 本次角色：DevOps
-- 动作：Ops Task（部署环境准备 / 凭据注入 / 连库与权限边界验证）
-- 涉及文档：`docs/progress/ad-hoc/2026-07-28-ops-server-env-and-credential.md`（本次运维记录，含完整证据）、`docs/progress/INDEX.md`
+- 动作：Ops Task（部署环境准备 / 凭据注入 / 连库与权限边界验证）+ **自我认领的事实订正** + 部署方案设计（Owner 要求「最健壮可复用」）
+- 涉及文档：`docs/progress/ad-hoc/2026-07-28-ops-server-env-and-credential.md`（本次运维记录，含完整证据、事实订正、§6 部署方案建议稿）、`docs/progress/INDEX.md`
+
+- **⚠️ 事实订正（本人 R3/R4 判断有误，自我认领）**：**v0.1 服务一直部署在该服务器上并持续运行**——pid 3026041，启动 2026-07-01 15:07:51，**已连续运行 26 天 23 小时**，cwd `/root/Project/niuma-cheng-ai`，`/health` 返回 200，该目录有完整 checkout + `.venv` + 07-01 建的 `.env`（LLM 凭据齐全）。故本人 R3 复审所写「**v0.1 的测试环境已不在**」「**ai 至今只在开发机跑过**」**均为错误**，PM 据此改写的 PRD §5 与 INDEX 亦需订正（PRD 订正走 Change Note，属 PM）。`v0.1-test-report.md:153`「当前服务实际未运行」同为开发机视角误判。**错因**：R3 的实查全部在开发机（macOS）执行，看到 `.env` 不存在、`8100` 无监听、无 `/root`，就把 `v0.1.md:46` 的 `127.0.0.1:8100` 读成「本机」，而该地址在服务器上下文同样成立——**用「我这边没有」推断了「根本不存在」，与 Developer 在 Q-4 上认领的错法完全同类，而我还在 R4 复审中引用过他那条教训**。教训：**跨环境的否定结论必须在目标环境本身取证，不能靠本地证据外推。** 结论方向（PRD 须写清 ai 跑在哪台机）仍成立，但「整块缺失」的成本判断错误，实际是「已有 v0.1 部署，需规范化 + 升级」。
 - 结论：**两项前置均已完成**。目标机定位为 **`zijie` / 115.191.43.79**（`dig news.huiyiyou.cloud` 得，Ubuntu 24.04，PG 在 `127.0.0.1:5432`，Python 3.12.3）；ai 部署到 **`/opt/niuma-cheng-ai`**（与 `/opt/news-aggregator`、`/opt/workboard-prod` 同级），clone + venv + 依赖完成，`PYTHONPATH=src pytest -q` **40 passed**，与 v0.1 基线一致。口令按 O-7 **拆字段**注入 `/opt/niuma-cheng-ai/.env`（`chmod 600`、`.gitignore:5` 覆盖、`git status` 0 次命中、28 字符与源文件一致、**全程未回显未落日志**）。以 `ai_worker` 实连 `news_test` 六项验证全过：身份正确 / 读授权列 5 条 queued / 读 v1.3 新 GRANT 两列 154 条 / 读 tasks / 越权读 `alerts` 拒绝 / 越权写 `raw_items.process_type` 拒绝——**权限矩阵与契约 v1.4 一致**。
 - 关联迭代：v0.2（实现阶段开工前置；PRD R4 已定稿，设计阶段进行中）
 - 关联非迭代工作：本次 ad-hoc
 - 关联 Change Note：无（发现 A/B 若确认需改 AC-8.2，由 PM 判定是否走 CN）
-- 遗留问题/风险：① **发现 A（阻塞级）`tasks` 表 `l1_ai_process` 记录数为 0**，而 `raw_items` 有 5 条 `queued`——按 AC-3.1「只 claim tasks 不扫 raw_items」，预置数据永远领不到；**直接阻塞 C-6 实证**（实证 SQL 返回 0 行时 `FOR UPDATE` 权限检查根本不触发，会得到假的「通过」），且 worker 上线会静默空转。非 C-5 的毫秒窗口，是造数脚本只造 `raw_items` 未造配套 task。需 PM 转达 xiaobao 补建/修脚本，并顺带确认 type 字面量是 `l1_ai_process` 还是既有的 `l1_process` ② **发现 B（高）`l0_label` 真实数据只有 `direct_display` 一个取值**（test 154 条全是它；生产 637 条 + 120 NULL，同样无第二个非空值）——它是**流程标记**不是领域分类，PRD C-1「不再恒空」与 AC-8.2「语义近似」被实测推翻；`domain_tags` 会恒为 `['direct_display']`，且因是真值会穿过 `news_l1.py:206` 的 `or None`，把噪声塞进 prompt 与 KB 查询，**比恒空更糟**。建议适配层把 `direct_display` 视同无分类映射为 `[]` ③ **LLM 凭据缺失**：`.env` 中 LLM/Tavily/KB token 留空待 Owner 提供，不影响 C-6（纯 SQL）但阻塞任何真实冒烟；本次未擅自跨项目取用 openclaw 的 key ④ **PRD §5「`.env` 应在仓外」与 `config.py:16` 无参 `load_dotenv()` 冲突**，本次按 v0.1 做法放仓内（gitignore + 600 覆盖风险），建议 PRD 订正措辞或实现阶段引入 `ENV_FILE` 变量 ⑤ **安全观察**：ai DevOps 在该机为 root 登录，PRD §5「授权二选一/不给全量 sudo」在当前配置下不适用，最小权限未满足（既有运维方式，非本次引入）⑥ 实测印证 C-12：`tasks.max_attempts=5`、`priority=100`，契约「最大 3」确与 schema 默认不一致，AC-5.1「读列禁硬编码」方向正确。
-- 下一步入口：PM 转达发现 A / B 给 xiaobao；发现 A 闭合后执行 AC-3.7 的 6 步 C-6 实证（若短期拿不到，可做降级版行锁权限探测但须在回帖写明是降级结论）；Owner 提供 LLM 凭据后做真实处理冒烟。
+- 遗留问题/风险：① **发现 A（阻塞级）`tasks` 表 `l1_ai_process` 记录数为 0**，而 `raw_items` 有 5 条 `queued`——按 AC-3.1「只 claim tasks 不扫 raw_items」，预置数据永远领不到；**直接阻塞 C-6 实证**（实证 SQL 返回 0 行时 `FOR UPDATE` 权限检查根本不触发，会得到假的「通过」），且 worker 上线会静默空转。非 C-5 的毫秒窗口，是造数脚本只造 `raw_items` 未造配套 task。需 PM 转达 xiaobao 补建/修脚本，并顺带确认 type 字面量是 `l1_ai_process` 还是既有的 `l1_process` ② **发现 B（高）`l0_label` 真实数据只有 `direct_display` 一个取值**（test 154 条全是它；生产 637 条 + 120 NULL，同样无第二个非空值）——它是**流程标记**不是领域分类，PRD C-1「不再恒空」与 AC-8.2「语义近似」被实测推翻；`domain_tags` 会恒为 `['direct_display']`，且因是真值会穿过 `news_l1.py:206` 的 `or None`，把噪声塞进 prompt 与 KB 查询，**比恒空更糟**。建议适配层把 `direct_display` 视同无分类映射为 `[]` ③ ~~LLM 凭据缺失~~ → **当日已解决**：凭据不在 openclaw，就在 ai 自己的 v0.1 部署 `/root/Project/niuma-cheng-ai/.env`（volcengine `doubao-seed-2.0-pro`），已合并进 `/opt` 的 `.env`（四项非空、600、未回显）。**但 `KB_ADMIN_TOKEN` 仍为空**（v0.1 就是空），而 DB 模式下 KB 由 ai 主动检索、会成常用路径，联调前须与 xiaobao 确认 ④ **PRD §5「`.env` 应在仓外」与 `config.py:16` 无参 `load_dotenv()` 冲突** → **部署方案已解**：按 xiaobao 惯例把运行目录（`/srv/niuma-ai/{test,prod}`）与 git 工作区分离，`.env` 置于运行目录即天然仓外，**代码零改动** ⑤ **安全观察**：ai DevOps 在该机为 root 登录，PRD §5「授权二选一/不给全量 sudo」在当前配置下不适用；部署方案已提出专用 `niuma-ai` 系统用户 + systemd 沙箱加固 ⑥ 实测印证 C-12：`tasks.max_attempts=5`、`priority=100`，契约「最大 3」确与 schema 默认不一致，AC-5.1「读列禁硬编码」方向正确 ⑦ **新增安全问题**：`/root/Project/niuma-cheng-ai/.env` 权限为 **644（全局可读）**，内含 `VOLC_API_KEY` 与 `TAVILY_API_KEY`，该机同时跑 xiaobao 生产与 workboard；建议改 600（未擅自改动，属既有部署）。
+
+- **v0.2 部署方案（Owner 2026-07-28 要求「最健壮可复用，非最方便」，方案见 ad-hoc §6）**：调研生态惯例后对齐 xiaobao 的三层分离骨架（构建源 `/opt` → rsync → 隔离运行目录 `/srv/niuma-ai/{test,prod}` → systemd），并补上 xiaobao 的三处缺口。**核心一项**：`TimeoutStopSec=280` —— ADR-0004 定应用层宽限期 260s，而 systemd `DefaultTimeoutStopSec` 通常 90s，不显式覆盖则**优雅停机每次都被中途 SIGKILL**、制造残留锁，正是本人 R3 高②与 R4 附条件所指。其余：`Restart=on-failure` 而非 `always`（优雅停机后正常退出不该被拉起，影响正确性非偏好）、`StandardOutput=journal` 而非 append 到文件（xiaobao 的 `/var/log/niuma-news-api.log` 已 13M 且无 logrotate，ai 是 7×24 worker 会更严重）、专用 `niuma-ai` 用户 + `ProtectSystem=strict` 等沙箱、`network-online.target`、模板 unit `@.service` 覆盖双环境、双 unit 对应 AC-1.4 进程级双模式、deploy.sh 加「单测通过才继续」闸门。**明确不做**：`Type=notify`+`WatchdogSec`（需改代码，列 v0.3）、healthcheck timer（**须先写死 AC-9.3 状态码语义**，否则会在优雅停机窗口内判死重启）、多实例、prod 环境。**范围提示**：PRD §4 现将托管化顺延 v0.3，理由是「形态未定怕返工」——**该理由已被 ADR-0003/0004 消解**（形态全定死），此时做不返工，但纳入 v0.2 属范围变更，须 PM 出 Change Note 裁定。
+- 下一步入口：**Owner 裁定部署方案与 v0.1 服务的处置**（建议：先建 test 新环境不动 v0.1，灰度通过后再迁移停旧）；PM 转达发现 A / B 给 xiaobao + 就托管化范围变更出 CN；发现 A 闭合后执行 C-6 实证；PRD §5 与 INDEX 中受事实订正影响的表述由 PM 走 CN 订正。
 - 收尾状态：已收尾
 
 ## 2026-07-27 — v0.2 PRD R4 DevOps 复审（PRD 定稿）
@@ -48,7 +52,7 @@
 - 关联迭代：v0.2（PRD 阶段 R1，Review中）
 - 关联非迭代工作：无
 - 关联 Change Note：无
-- 遗留问题/风险：① **测试环境已不在**——`.env` 不存在、`8100` 无监听、本机 `5432` 无监听，v0.2 是环境重建 + 新增共享库外部依赖，部署面大于 v0.1，需在设计/部署阶段按新形态重建 ② coordination R-1/R-2/R-3（`ai_worker` GRANT 就绪 / schema 迁移落地 / 连接信息与凭据渠道）仍待 xiaobao 与 Owner 回应，其中 R-3 是 O-7 落地前置 ③ 造数依赖需 PM 在 coordination REQ-003 待跟进表追加一行 ④ 托管化顺延 v0.3 的代价是 v0.2 worker 崩溃不自动拉起、队列静默积压 ⑤ O-1（P0）未决，PRD 无论如何不能定稿。
+- 遗留问题/风险：① ~~**测试环境已不在**~~ **【2026-07-28 订正：本条错误，v0.1 服务在服务器上一直运行，见 07-28 条目】**——`.env` 不存在、`8100` 无监听、本机 `5432` 无监听（**均为开发机 macOS 上的实查结果，不代表服务器**），v0.2 是环境重建 + 新增共享库外部依赖，部署面大于 v0.1，需在设计/部署阶段按新形态重建 ② coordination R-1/R-2/R-3（`ai_worker` GRANT 就绪 / schema 迁移落地 / 连接信息与凭据渠道）仍待 xiaobao 与 Owner 回应，其中 R-3 是 O-7 落地前置 ③ 造数依赖需 PM 在 coordination REQ-003 待跟进表追加一行 ④ 托管化顺延 v0.3 的代价是 v0.2 worker 崩溃不自动拉起、队列静默积压 ⑤ O-1（P0）未决，PRD 无论如何不能定稿。
 - 下一步入口：Architect / Developer 补做 PRD R1 Review；PM 按本轮意见修改进 R2；DevOps 待 R-3 回应后落地凭据注入 + 重建测试环境。
 - 收尾状态：已收尾
 
