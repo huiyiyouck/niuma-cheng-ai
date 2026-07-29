@@ -1,5 +1,23 @@
 # DevOps 角色日志
 
+## 2026-07-28 — 实机复验 xiaobao 三条回帖：C-6 完整闭合 + KB 方案A确认 + 新发现 domain_tags 类型不统一
+
+- 本次角色：DevOps
+- 动作：Ops Task（跨项目回帖的实机复验 / C-6 并发实证 / KB 鉴权验证）+ 跨仓回帖
+- 涉及文档：coordination `communications/REQ-003-db-boundary-async.md`（回帖 + 待跟进表 6f/6h 闭合、6g 转 6i、新增 6i/6j，commit `611b2d9` 已 push）、`docs/progress/INDEX.md`
+- 结论：**xiaobao 三条回帖逐条实机复验，两条闭合、一条新问题。**
+  ① **C-6 完整闭合** —— 对方验权限侧，**我方补齐并发侧**：两会话同时 claim 拿到不同行（`ee471923…` / `5b0e6f71…`），SKIP LOCKED 生效、并发不重复领取；越权 `UPDATE tasks SET type` 仍 permission denied；全程 ROLLBACK、队列未消耗（仍 5 条）。**列级 GRANT 足以支撑行锁，对方预留的「改授表级」不必执行**；「v0.3 多实例前必须先解决 C-6」前置可解除。
+  ② **队列修复已复验** —— 5 条 `l1_ai_process`/`queued`/`run_after<=now()` 可领，`priority=0`、`max_attempts=3`、`raw_item_id` 非空。
+  ③ **KB token 闭合** —— 方案 A 实测可用：不带 token 与带错误 token 均 **HTTP 200 且返回真实检索结果**（IP 白名单优先）。ai 已配同机直连，无需 token。**认同对方不下发全权 `ADMIN_TOKEN`** 的判断（为一个只读检索授予全部 admin 写权限不成比例）。
+  ④ **新发现（高）`sources.domain_tags` 类型不统一** —— `sources` 4 行中 2 行 `array`（`["AI"]`）、2 行 `object`（`{}`）；**5 条待冒烟条目 JOIN 其 source 全部返回 `{}`**。故 xiaobao Architect「拿到该列后与 HTTP 模式**完全等价**」的结论**在当前测试数据上不成立**（仍恒空）；且 `{}` 是 object 非 array，`L1Input.domain_tags` 为 `list[str]`，按数组处理会校验失败 → `MappingError(client_error)` → 按设计 §4.4 **不可重试直接 final_failed，5 条冒烟全报废**。已要求 ai 侧入向映射自行兜底（仅 `jsonb_typeof='array'` 时取用）。
+  ⑤ **提示 6j** —— `tasks` 表**无任何 CHECK 约束**，`status` 写什么 DB 都不拦；对方 C-6 实证 SQL 用 `processing` 而 C-2 枚举是 `running`，已要求确认其后端读哪个。
+- 关联迭代：v0.2（设计阶段，R2 三方通过；本次为跨项目联调前置的实机验证）
+- 关联非迭代工作：`ad-hoc/2026-07-28-ops-server-env-and-credential.md`
+- 关联 Change Note：**本次发现④直接影响 CN-007**——其撤回 CN-004 变更 1 的依据是「domain_tags 真源找到、完全等价、不再是已知限制」，而实测表明对冒烟数据仍恒空、且类型不统一会致映射失败。**建议 PM/Architect 复核 CN-007 的该条结论**，至少保留「入向映射须做 jsonb 类型判定」这一实现约束。
+- 遗留问题/风险：① 6i / 6j 待 xiaobao 确认 ② 若不补 `domain_tags` 非空 source 下的待处理条目，「有值」路径**直到生产才第一次被执行** ③ 本人订正一处：上帖把 `SELECT config FROM sources` 列为越权对照系我方预期有误，`config` 本就在授权列内（实测授权列 `id/type/identity/config/domain_tags/attention_level`），已在回帖中更正 ④ systemd unit 仍未实际安装 ⑤ v0.1 服务处置、旧 `.env` 644→600 待定。
+- 下一步入口：xiaobao 回应 6i/6j；PM/Architect 复核 CN-007 受影响结论；实现阶段开工前补 DB 超时配置（我 R2 附条件）；Owner 确认后装 unit。
+- 收尾状态：已收尾
+
 ## 2026-07-28 — v0.2 设计 R2 DevOps 复核（设计三方齐、可定稿）
 
 - 本次角色：DevOps

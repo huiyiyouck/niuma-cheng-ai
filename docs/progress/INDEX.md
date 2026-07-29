@@ -11,9 +11,15 @@
 - 阻塞项：**无**。
 - **2026-07-28 xiaobao 三方全部答复，四件大事全解（均为好消息）**：
   1. **`domain_tags` 真源找到，差异消除** —— xiaobao Architect **主动撤回其上轮对 C-1 的错误答复并认账**：真源是 **`sources.domain_tags`**（信息源级静态领域标签），**不是** `raw_items.l0_label`。GRANT 已执行、契约升 **v1.5** → **DB 模式与 HTTP 模式在该字段上完全等价**，不再是已知限制。**CN-004 变更 1 整条作废**（其前提已被撤回），由 **CN-007** 撤回、**CN-006**（Architect）同步重写设计 §3.3。
-  2. **C-6 行锁实证通过** —— xiaobao DevOps 以 `ai_worker` 实测 `FOR UPDATE SKIP LOCKED` 在列级 GRANT 下可行 → **claim 采用写法 A**。⚠️ 但这是**单会话可行性**，**多实例并发验证仍在 ai 侧待做**，§4 的「v0.3 多实例前必须先解决 C-6」前置**不解除**。
+  2. **C-6 行锁实证完整闭合（2026-07-28）** —— xiaobao DevOps 验**权限侧**（`ai_worker` 身份下 `FOR UPDATE SKIP LOCKED` + claim 写入在列级 GRANT 下可行 → claim 采用**写法 A**）；**ai DevOps 已补齐并发侧**（两会话同时 claim 拿到不同行 `ee471923…` / `5b0e6f71…`，SKIP LOCKED 生效、并发不重复领取；越权 `UPDATE tasks SET type` 仍 permission denied；全程 ROLLBACK、队列未消耗）。**结论：列级 GRANT 足以支撑行锁，xiaobao 预留的「改授表级」不必执行。** → 「v0.3 多实例前必须先解决 C-6」这条前置**可以解除**（正确性已验；多实例的吞吐与锁竞争观察仍留 v0.3）。已回帖 coordination（`611b2d9`）。
   3. **测试队列已修复** —— xiaobao DevOps 认领系其造数脚本缺陷（「正是 C-5 讨论过的形态，这次是我造出来的」），已补建 5 条 task + 订正脚本为幂等 → **AC-10.2 真实数据冒烟的数据阻塞解除**。
   4. **日增量已答** —— 活跃期日均 **15~30 条**（生产 757 条系 50+ 天累积），可预见增长无「上千条/天」场景 → 对照 ai 能力上界（340~920 条/天）**有 5~10 倍余量**，**v0.3 并发化无需排期前移**（O-11 由 P1 降 P2）。对方承诺量级跃迁时**提前经 coordination 知会**。
+- **⚠️ ai DevOps 实机反证（2026-07-28，已回帖 coordination `611b2d9`）——第 1 条「完全等价」在当前测试数据上不成立**：
+  - 实测 `sources` 全部 4 行中 **2 行 `array`（`["AI"]`）、2 行 `object`（`{}`）**，`domain_tags` 列**类型不统一**；
+  - 而 **5 条待冒烟条目 JOIN 其 source 全部返回 `{}`** → 对这批数据 `domain_tags` **依然恒空**，「不再是已知限制」的结论对冒烟数据不适用；
+  - 更关键：`{}` 是 object 非 array，`L1Input.domain_tags` 为 `list[str]`，按数组处理会触发校验失败 → 归 `MappingError(client_error)` → 按设计 §4.4 **不可重试直接 final_failed，5 条冒烟会全报废**；
+  - **ai 侧已自行兜底**：入向映射仅在 `jsonb_typeof='array'` 时取用，`object`/`null`/缺失一律映射 `[]`（已登记 coordination 6i，待 xiaobao 确认预期类型 + 补 `domain_tags` 非空的待处理条目，否则「有值」路径直到生产才首次执行）。
+  - 另登记 6j（提示）：**`tasks.status` 无 CHECK 约束**，写任何值 DB 都不拦；xiaobao C-6 实证 SQL 用的是 `processing` 而 C-2 枚举是 `running`，需确认其后端读哪个——无约束兜底时两侧各写各的不报错，但状态机认不出。
 - **C-1~C-14 全部闭合**（已闭合计数 13 → **18**）；C-11/C-12/C-13 的答复**均与 ai 的假设一致**，无需改实现（C-13 确认 URL 前缀不保证 → ai 的规范化**必须保留**）。
 - **仅剩 Q-1**（`needs_context` 是否补列）待 xiaobao PM 表态，不阻塞。
 - **KB 检索鉴权定案（CN-007）**：取**方案 A —— 同机内网直连 + IP 白名单，无需 token**。不采用方案 B（唯一可用的是 xiaobao **全权 `ADMIN_TOKEN`**，下发即授予其所有 admin 写权限，**违反最小权限**，双方均不采纳）。**部署约束须入部署就绪检查**：方案 A 的唯一前提是**同机**；任一侧迁机则 IP 白名单失效、KB 全部失败，且**主流程不中断只持续降级**——正因不中断更需显式核对。
