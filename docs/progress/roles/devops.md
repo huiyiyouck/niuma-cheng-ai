@@ -1,5 +1,18 @@
 # DevOps 角色日志
 
+## 2026-07-28 — v0.2 设计 R2 DevOps 复核（设计三方齐、可定稿）
+
+- 本次角色：DevOps
+- 动作：Review（设计 R2 复核 · 三层逐层放大 / 部署脚本强制点 / 自愈不 fail-fast / 判读顺序）
+- 涉及文档：`docs/progress/iterations/v0.2-design.md`（追加 §R2 DevOps 复核 + 订正 Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（当前阶段 + 设计阶段 R2 行 + Review 记录表）；实读 R2 全文并对 R1 逐条 diff 比对，与本人 commit `2ce32cd` 的 `deploy/` 配置交叉验证
+- 结论：**通过（附条件）**（1 高 2 中，均不阻塞定稿）。**设计 R2 三方齐、全部通过**（Developer 通过 / PM 通过·附条件 / DevOps 通过·附条件），设计阶段可定稿。**我 R1 四条全部收敛，其中 2 条强于原建议**：§4.8 除逐层放大不等式外还补了**三层各自的语义定义**（「最多用多久收尾」/「等待在途请求」/「从 SIGTERM 到 SIGKILL 的墙钟」）——这才是三者不能相等的根因，比记住一个数字耐久；`self_heal_failed` 不止「记 ERROR 后继续」而是进了 `/health` 状态位（启动日志会被后续日志淹没，状态位不会）。**附条件·高①：数据库操作没有任何时间上限** —— `ItemBudget` 只覆盖处理阶段，claim 与写回两个事务在所有预算之外，且 `connect_timeout`/`statement_timeout`/`lock_timeout` **全文零命中**。§4.6「重试总耗时 ≤2s、20s 余量已覆盖」的断言只在每次重试立即失败时成立，而其触发条件含 `deadlock_detected`/`serialization_failure`——本质是锁等待，无 `lock_timeout` 时 PG **无限等**。真实场景：写回三表时 xiaobao 的 1800s 卡死回收正在 UPDATE 同一行 `tasks`（两侧写竞争是契约固有面）→ 停机时超 260s 宽限期、被 280s SIGKILL、**写回在 COMMIT 前中断留残留锁**（三层时限链要防的事，这次原因是**算式漏项**而非配置写错）；非停机时 worker 静默卡在写回、`in_flight` 恒 1 且无自愈。中②`dead` 状态在 v0.2 无任何自动消费方（systemd `Restart=on-failure` 只看进程退出码，而 worker 协程死了进程仍在；healthcheck timer 尚未纳入），§3.6「托管层应有反应：重启」会造成误期待。中③§4.12 的「指定落盘路径 + 人工轮转」表述停留在托管化之前，与已落地的 `StandardOutput=journal` 冲突。
+- 关联迭代：v0.2（设计阶段 R2，三方齐·全部通过·两方附条件）
+- 关联非迭代工作：无
+- 关联 Change Note：CN-003 / CN-004（仍待本角色确认）；PM R2 附条件将新出 CN 订正 PRD AC-5.7 的「三层配一致值」
+- 遗留问题/风险：① **本轮附条件（DB 操作超时上限）须在实现阶段开工前补入**——等实现完再补要回头改事务代码；建议取 `statement_timeout=8s`/`lock_timeout=5s`，则写回重试最坏 `2×(8+1)=18s < 20s` 余量，算式自洽且无需改动已定的 260/280 ② PM 侧附条件（PRD AC-5.7 与设计 §4.8 冲突、**错在 PRD**）待其出 CN ③ systemd unit 仍未实际安装（待 Owner 确认）④ 托管化纳入 v0.2 的范围变更仍待 PM 出 CN ⑤ C-6 实证仍被实机发现 A 阻塞 ⑥ v0.1 服务处置、旧 `.env` 644→600 待定。
+- 下一步入口：两条附条件落地后设计定稿进实现阶段；Owner 确认后装 unit；xiaobao 回应发现 A 后跑 C-6 实证。
+- 收尾状态：已收尾
+
 ## 2026-07-28 — v0.2 设计 R1 DevOps Review
 
 - 本次角色：DevOps
