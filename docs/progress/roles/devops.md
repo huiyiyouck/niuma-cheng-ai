@@ -1,5 +1,19 @@
 # DevOps 角色日志
 
+## 2026-07-28 — v0.2 设计 R1 DevOps Review
+
+- 本次角色：DevOps
+- 动作：Review（设计 R1 · 运行参数一致性 / 探活与状态码 / 连接池与隔离级别）+ 据 Review 结论回补自身托管配置
+- 涉及文档：`docs/progress/iterations/v0.2-design.md`（追加 §R1 DevOps Review + 订正 Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（设计阶段 R1 行 + Review 记录表）、`docs/progress/INDEX.md`（跨任务待办本角色行状态）；实读 `v0.2-design.md` 全文 + ADR-0004，**并与本人当日提交的 `deploy/` 配置逐行比对**
+- 结论：**未通过**（2 高 2 中，需 Architect 修改后 R2）。三方齐、均未通过（PM 3 高 2 中 / Developer 1 高 5 中 2 低 / DevOps 2 高 2 中）。**本轮 4 条与另两方 0 重叠**——全部落在应用层与托管层的接缝上，是只有拿着 unit 文件对着设计读才会发现的一类。高①**§4.8 把「三层配一致」落成三层数值全等（都 260s），边界必然竞态**：应用层 grace 是「worker 最多用多久收尾」、systemd `TimeoutStopSec` 是「从 SIGTERM 到 SIGKILL 的墙钟」，二者相等时 worker 恰好用满 260s 完成最后一次写回、systemd 同时 SIGKILL → 写回可能在 COMMIT 前被杀、留下残留锁，正是这条链要防的事；应为**逐层放大**（应用 260 ≤ ASGI ≥260 < systemd 280）。**表述责任本人认领**——R3 高②写的「三层须配一致值」本意是「协调」而非「相等」。高②**三层强制点错放在应用启动校验**：§2.6 门禁读不到 unit 的 `TimeoutStopSec`；漂移路径为 `L1_CLAIM_BATCH_SIZE` 校验允许 N 最大配到 4 → 应用侧强制 grace ≥960s 且启动成功 → 而 `TimeoutStopSec` 是 unit 常量不跟着变 → systemd 提前 SIGKILL，**且应用侧校验全绿、比不配更隐蔽**；强制点只能落部署层。中③§4.1 启动自愈失败会导致进程拒绝启动，可用性取舍反了（自愈只是加速回收自己上次的锁，失败有 xiaobao 1800s 兜底，且失败最可能因 DB 抖动、那时更该起来重试）。中④`stale_tolerance_ms` 判读顺序未写，`stopping` 态下 `last_poll_at` 陈旧属正常但会超阈值，v0.3 healthcheck timer 会误判。
+- 关联迭代：v0.2（设计阶段 R1，三方齐·均未通过，待 Architect 出 R2）
+- 关联非迭代工作：`ad-hoc/2026-07-28-ops-server-env-and-credential.md`（同日运维产出，本 Review 与之互为验证）
+- 关联 Change Note：CN-003 / CN-004（均待三方确认，本角色待确认）
+- **本轮同时回补了自身产出的两处缺口**（不占 Architect 工时）：① 两个 unit 的 `ExecStart` 补 `--timeout-graceful-shutdown`（worker 取 `systemd.env` 的 `SHUTDOWN_GRACE_SEC`、http 取 60s），此前缺该参数——uvicorn 默认不限制故不会提前杀，但设计 §4.8 要求 ASGI 层显式配置；② `deploy.sh` 新增「三层停机时限校验」步骤（比对 `.env` 的 `L1_SHUTDOWN_GRACE_MS`、`systemd.env` 的 `SHUTDOWN_GRACE_SEC`、unit 的 `TimeoutStopSec`，ASGI 须等于应用层、systemd 须**严格大于**应用层，不满足拒绝部署）——这正是问题 2 所说的「强制点只能在部署层」的落地。两个 unit 复验通过 `systemd-analyze verify`（唯一告警是模板 `%i` 展开为字面 `i` 且运行目录未建，属预期）。
+- 遗留问题/风险：① 设计 R2 须落实两条高，否则实现会照现文把三层写成同一个数字 ② C-6 实证仍被实机发现 A 阻塞，待 xiaobao 回应 ③ systemd unit 尚未实际安装（建系统用户 + 装 unit 属系统级变更，待 Owner 确认）④ 托管化纳入 v0.2 的范围变更仍待 PM 出 CN（PRD §4 现仍写顺延 v0.3）⑤ v0.1 服务处置待定 ⑥ 旧 `.env` 644 权限待改 600。
+- 下一步入口：Architect 出设计 R2 → 三方复审；Owner 确认后装 unit；xiaobao 回应发现 A 后跑 C-6 实证。
+- 收尾状态：已收尾
+
 ## 2026-07-28 — 服务器部署环境准备 + 口令注入 + **事实订正** + v0.2 部署方案
 
 - 本次角色：DevOps

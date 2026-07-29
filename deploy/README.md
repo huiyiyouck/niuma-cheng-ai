@@ -17,7 +17,7 @@
 | 文件 | 谁读 | 放什么 |
 |---|---|---|
 | `/srv/niuma-ai/<env>/.env` | 应用（`load_dotenv()`） | 应用配置与凭据：`AI_DB_*`、`LLM_PROVIDERS_JSON`、`VOLC_API_KEY`、`TAVILY_API_KEY` 等。`chmod 600` |
-| `/srv/niuma-ai/<env>/systemd.env` | systemd（`EnvironmentFile=`） | **只放简单值**，当前仅 `PORT=`。systemd 的 EnvironmentFile 解析不了 `LLM_PROVIDERS_JSON` 里的嵌套引号，故与上面那份分开 |
+| `/srv/niuma-ai/<env>/systemd.env` | systemd（`EnvironmentFile=`） | **只放简单值**：`PORT=` 与 `SHUTDOWN_GRACE_SEC=`（后者供 uvicorn 的 `--timeout-graceful-shutdown`，须等于 `.env` 里 `L1_SHUTDOWN_GRACE_MS/1000`，由 `deploy.sh` 强制校验）。systemd 的 EnvironmentFile 解析不了 `LLM_PROVIDERS_JSON` 里的嵌套引号，故与上面那份分开 |
 
 `RUN_MODE` 不放这两个文件——它由 unit 的 `Environment=RUN_MODE=` 决定（`load_dotenv()` 默认 `override=False`，systemd 注入的值优先）。这样「一个进程只跑一种模式」由托管层保证，对应 AC-1.4 的进程级开关。
 
@@ -30,7 +30,7 @@ useradd --system --no-create-home --shell /usr/sbin/nologin niuma-ai
 # 2. 运行目录与配置
 mkdir -p /srv/niuma-ai/test
 install -m 600 -o niuma-ai -g niuma-ai /dev/null /srv/niuma-ai/test/.env
-printf 'PORT=8100\n' > /srv/niuma-ai/test/systemd.env
+printf 'PORT=8100\nSHUTDOWN_GRACE_SEC=260\n' > /srv/niuma-ai/test/systemd.env
 #    → 再把 .env 内容准备好（DB 口令按 O-7 拆字段；口令不经对话、不入 git）
 
 # 3. 安装 unit
@@ -58,6 +58,7 @@ systemctl stop niuma-ai-worker@test                # 优雅停机，最长等 28
 | 配置 | 值 | 不这么配会怎样 |
 |---|---|---|
 | `TimeoutStopSec`（worker） | **280** | ADR-0004 定应用层宽限期 260s，而 systemd 默认 90s。不覆盖则**优雅停机每次都被中途 SIGKILL**，留下 `l1_status='processing'` 残留锁，只能等 xiaobao 侧 1800s 卡死回收，每条延迟 ≥30 分钟 |
+| **三层关系** | **逐层放大，不是相等** | 应用 260s ≤ ASGI 260s < systemd **280s**。若三者取同一个值，worker 恰好用满 260s 完成最后一次写回时 systemd 同时 SIGKILL，**写回可能在 COMMIT 之前被杀**——正是这套配置本要防的事。`TimeoutStopSec` 不支持 EnvironmentFile 变量展开、只能是常量，故该关系由 `deploy.sh` 在部署时强制校验（应用启动校验读不到 systemd 配置，管不到这一层） |
 | `Restart`（worker） | **on-failure** | 用 `always` 时，优雅停机后 worker 正常退出（exit 0）会被立刻拉起重新 claim。**影响正确性，不是策略偏好** |
 | `StartLimitIntervalSec/Burst` | 300 / 3 | 崩溃循环会反复 claim、反复制造残留锁。单条预算 240s，故窗口比 xiaobao 的 60s 更长 |
 | `After`/`Wants` | `network-online.target` | `network.target` 只表示网络栈启动、**不保证网络可用**，而 ai 启动即连 DB 与外部 LLM API |

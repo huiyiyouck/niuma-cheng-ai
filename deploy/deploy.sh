@@ -58,6 +58,39 @@ done
 chmod 600 "$RUN/.env"
 chown -R niuma-ai:niuma-ai "$RUN"
 
+echo "==== [4.5/6] 三层停机时限校验 ===="
+# 设计 R1 · DevOps Review 问题 2：应用启动校验只能覆盖应用侧的量，
+# 读不到 unit 里的 TimeoutStopSec——三层关系的强制点只能在部署层。
+# 漂移场景：把 L1_CLAIM_BATCH_SIZE 调大后应用侧强制 grace 变大、启动成功，
+# 而 TimeoutStopSec 是 unit 常量不会跟着变 → systemd 照样提前 SIGKILL，
+# 且应用侧所有校验都是绿的，比不配更隐蔽。
+GRACE_MS=$(grep -E '^L1_SHUTDOWN_GRACE_MS=' "$RUN/.env" | cut -d= -f2 || true)
+GRACE_MS=${GRACE_MS:-260000}
+GRACE_SEC_ENV=$(grep -E '^SHUTDOWN_GRACE_SEC=' "$RUN/systemd.env" | cut -d= -f2 || true)
+GRACE_SEC_EXPECT=$(( GRACE_MS / 1000 ))
+
+# ASGI 层必须与应用层一致（uvicorn 的 --timeout-graceful-shutdown 从这里取值）
+if [ "$GRACE_SEC_ENV" != "$GRACE_SEC_EXPECT" ]; then
+  echo "!! systemd.env 的 SHUTDOWN_GRACE_SEC=$GRACE_SEC_ENV 与 .env 的 L1_SHUTDOWN_GRACE_MS=$GRACE_MS（=${GRACE_SEC_EXPECT}s）不一致" >&2
+  echo "   ASGI 层宽限期须等于应用层，否则 uvicorn 会先于 worker 结束进程" >&2
+  exit 1
+fi
+
+# 托管层必须【严格大于】应用层——逐层放大，不是相等（DevOps Review 问题 1）
+for unit_file in /etc/systemd/system/niuma-ai-worker@.service /etc/systemd/system/niuma-ai-http@.service; do
+  [ -f "$unit_file" ] || continue
+  TSS=$(grep -E '^TimeoutStopSec=' "$unit_file" | cut -d= -f2)
+  case "$unit_file" in *worker*) MIN=$GRACE_SEC_EXPECT ;; *) continue ;; esac
+  if [ "$TSS" -le "$MIN" ]; then
+    echo "!! $(basename "$unit_file") 的 TimeoutStopSec=${TSS}s 未严格大于应用层宽限期 ${MIN}s" >&2
+    echo "   相等会在边界产生竞态：worker 恰好用满时 systemd 同时 SIGKILL，写回可能在 COMMIT 前被杀 → 残留锁" >&2
+    echo "   建议 TimeoutStopSec = ${MIN} + 20 = $(( MIN + 20 ))" >&2
+    exit 1
+  fi
+  echo "  ✓ $(basename "$unit_file"): TimeoutStopSec=${TSS}s > 应用层 ${MIN}s"
+done
+echo "  ✓ 三层关系：应用 ${GRACE_SEC_EXPECT}s ≤ ASGI ${GRACE_SEC_ENV}s < systemd"
+
 echo "==== [5/6] 重启服务 ===="
 systemctl daemon-reload
 # RUN_MODE 由 unit 决定（见 unit 内 Environment=RUN_MODE），此处按启用状态重启

@@ -34,13 +34,27 @@ Environment=PYTHONUNBUFFERED=1
 # 由 unit 决定进程跑哪种模式，对应 AC-1.4 的进程级开关。
 Environment=RUN_MODE=db
 
-ExecStart=/srv/niuma-ai/%i/.venv/bin/uvicorn agent_hub.main:app --host 127.0.0.1 --port ${PORT}
+# --timeout-graceful-shutdown 是 ASGI 层的宽限期（设计 §4.8 三层之一）。
+# 取值来自 systemd.env 的 SHUTDOWN_GRACE_SEC，由 deploy.sh 校验其与 .env 的
+# L1_SHUTDOWN_GRACE_MS 一致——不在此硬编码，避免两处各写一个数字后漂移。
+ExecStart=/srv/niuma-ai/%i/.venv/bin/uvicorn agent_hub.main:app \
+          --host 127.0.0.1 --port ${PORT} \
+          --timeout-graceful-shutdown ${SHUTDOWN_GRACE_SEC}
 
 # ============ 优雅停机（本 unit 最关键的一段） ============
-# ADR-0004 定应用层宽限期 260s（单条 wall-clock 预算 240s + 余量）。
+# ADR-0004 定应用层宽限期 260s（单条 wall-clock 预算 240s + 20s 收尾余量）。
 # systemd 的 DefaultTimeoutStopSec 通常为 90s——若不显式覆盖，优雅停机每次
 # 都会在处理中途被 SIGKILL，留下 l1_status='processing' 的残留锁，
 # 使这批条目只能等 xiaobao 侧 1800s 卡死回收，每条延迟 ≥30 分钟。
+#
+# 三层是【逐层放大】而不是数值相等（设计 R1 · DevOps Review 问题 1）：
+#   应用层 grace (260s) ≤ ASGI 层 (260s) < systemd TimeoutStopSec (280s)
+# 若三者相等，worker 恰好用满 260s 完成最后一次写回时 systemd 同时 SIGKILL，
+# 写回可能在 COMMIT 之前被杀——正是这段配置本要防的事。
+#
+# 注意 TimeoutStopSec 不支持 EnvironmentFile 变量展开，只能是常量；
+# 它与 L1_SHUTDOWN_GRACE_MS 的关系由 deploy.sh 在部署时强制校验
+# （应用启动校验读不到 systemd 配置，管不到这一层）。
 KillSignal=SIGTERM
 TimeoutStopSec=280
 KillMode=mixed
