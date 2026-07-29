@@ -1,5 +1,46 @@
 # Developer 角色日志
 
+## 2026-07-28 — v0.2 设计 R2 复审（通过）
+
+- 本次角色：Developer
+- 动作：Review（设计 R2 三方复核第一交；PM / DevOps 待做）
+- 涉及文档：`docs/progress/iterations/v0.2-design.md`（追加 R2 Review 记录 + Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（设计门禁 + Review 记录）；逐条实读 §2.4 / §3.2 / §3.4 / §4.5~4.7 / §4.11 / §4.12 / §6.1 / §8 / §11；核对 `tests/test_news_l1.py:60-75` `NullTools`、`tests/test_news_l1_tools.py:16-45` `FakeTools` 的 `ToolResult` 返回语义
+- 结论：**设计 R2 Developer 复审通过**（2 中 2 低，均不阻塞定稿）。
+  1. **R1 八条全部收敛到位**（逐条实读核验，非只看修改记录）：`release` 补进 §3.2 且联动 §4.7 失败表「主动释放」独立行 / §7.1 取舍 / 测试 21；§1.3 与 §6.1 步 4 的 `run_task` 签名已一致；§4.5 预算改走 `complete_json(timeout_ms=budget.remaining_ms())` 并写明「本处只需一行改动」；`MIN_SEGMENT_MS` 进 §2.4 定义 + §2.6 配置 + 测试 18；`l1_attempt` 移入 §3.4 步骤 4 且 §4.6/§4.7 重复递增已删干净 + 测试 23 验崩溃窗口；§6.1 步 1/2/4 均已补黄金样本判据；低⑧ 按 PRD 边界不改判、只补 §7.2 与日志标注。
+  2. **三处处置强于我的原建议**：① 写回重试把可重试 PG 错误类（连接错误 / `deadlock_detected` / `serialization_failure`）与确定性错误分开列举，并算清重试耗时与停机宽限期 20s 余量的关系；② `slice_for` 阈值之外还统一了 `error_kind=budget_exhausted`（配合 CN-004），把「预算跳过」与「工具故障」在日志层彻底分开；③ `release` 不止补方法，还把「为什么不能复用 `mark_failed`」写成正文旁注——实现最可能图省事的正是这一处。
+  3. **中①黄金样本与 AC-7 的边界未声明**：步 3 同时做「要求行为不变的 async 改造」与「有意改变行为的 AC-7 三分支」，而完成判据是「黄金样本四类逐字段比对通过」，样本 ② 恰好断言 `tags.processing` 的 `degraded:` 标记完全一致——而 AC-7 修复正是要改变空结果时的 `degradations` 产出。实查现有 fake：`NullTools` 三方法均返回 `ToolResult(ok=False, error="disabled")`、`FakeTools` 默认 `ok=False, error="failed"`，**均为故障语义**，故照现有 fake 录制不会撞车；但这是巧合非设计保证（`FakeTools` 支持传入 `ok=True, items=[]`）。建议 §6.2 写死「四类样本均不得含『调用成功但无结果』场景，该场景由测试 17 独立覆盖且期望值是改造后的新语义」。
+  4. **中②§8 测试 8 的 `error_kind` 漏改**：§11 称四处正文的 `timeout` 已全部订正为 `budget_exhausted`（我逐处核对确已订正），唯独**验证这件事的测试 8** 仍写 `error_kind=timeout`，与 §4.5 直接冲突；且与新增测试 18 断言同一件事却取值相反，两条测试会互相打架。CN-004 变更 3 的要点正是「两者必须分开记」，漏改位置恰是它的验证点。
+  5. **低③④**：§3.2 末尾旁注仍写「四个方法」（新增 `release` 后应为五个，且该句就在新增方法正下方）；预算跳过时 `tool_budget_used` 是否递增未说明（与 `tool_summary` 在同一 updates 字典 `news_l1.py:209-212`，不明确会白吃一次 `max_tool_calls` 配额、影响 `_budget_ok` 路由判定）。
+  6. **R2 新增内容评估**：§4.11 四行判定表把三种情形在 `degradations`/`tool_summary`/日志三维度定死，可直接照写；**把 AC-7 与 deadline 并入步 3「同一段代码只动一次」的判断正确**（三处 `if result.ok and result.items:` 确实同时是两件事的改动点）；§4.12 新增 `budget_remaining_ms` 对灰度期定位「预算被谁吃掉」很有用；测试 17~24 与新增条款一一对应、无凑数项。
+  7. **工作量**：§4.11/§4.12 属已授权范围内的落点补齐（AC-7、AC-6 本就在 PRD 内，R1 只是漏了落点），两个新配置项是我方 R1 意见的直接产物。**与 PRD §8 成本表仍相符，未扩范围。**
+- 关联迭代：v0.2
+- 关联非迭代工作：无
+- 关联 Change Note：CN-004（`error_kind` 新增 `budget_exhausted`，本轮中② 即其漏改点）
+- 遗留问题/风险：① 中①② 若不在定稿前订正，会分别导致「录样本时踩坑要到步 3 才暴露」与「两条测试断言打架」② `domain_tags` 在 DB 模式实际恒为 `[]`（发现 B）仍待 C-14 确认 ③ 测试 20（AC-10.2 端到端）前置为发现 A 闭合（xiaobao 补建 task 行）
+- 下一步入口：PM / DevOps 完成设计 R2 复核 → 三方齐后设计定稿 → 进实现阶段（按 §6.1 步 0 先录黄金样本，再自底向上五步）
+- 收尾状态：已收尾（复审交付完成）
+
+## 2026-07-28 — v0.2 设计 R1 Review
+
+- 本次角色：Developer
+- 动作：Review（设计 R1 三方之一：PM / Developer / DevOps）
+- 涉及文档：`docs/progress/iterations/v0.2-design.md`（追加 R1 Review 记录 + Review 状态表本角色行）、`docs/progress/iterations/v0.2.md`（设计门禁 + Review 记录）；实读 ADR-0003 / ADR-0004、`v0.2-prd.md` R4 + CN-003；核对 `llm/client.py:88-160/211-221`、`graphs/news_l1.py:327-335`、`tools/base.py:33-60`、`tasks.py:55-72`
+- 结论：**设计 R1 Developer Review 未通过**（1 高 5 中 2 低）。**无方向性分歧**——协议分层、三段式事务、`lock_token` 两段式、deadline 传递、五步自底向上改造都能直接落地；本轮问题全部是「实现会话照文档写会卡住或走偏」的具体缺口，修正量小。
+  1. **高①`PullSource` 协议缺 `release`**：§4.2 主循环第 474 行 `await source.release(item)`，而 §3.2 只定义四个方法 → 照文档实现直接撞 `AttributeError`。且语义未定义：停机释放「已 claim 未处理」的条目应退回 `queued` + 清锁 + **不动 `attempt`**；复用 `mark_failed(retryable=True)` 会污染 `attempt` 与 `last_error_kind`，让一次正常停机看起来像处理失败并白耗一次重试配额。
+  2. **中②`run_task` 签名文档自相矛盾**：§1.3 第 53 行「签名不变」vs §4.5 第 497 行「新增 `budget` 参数」。认同 §4.5 的实质（budget 是数据源无关量，不违反 AC-2.2），应订正 §1.3。
+  3. **中③LLM 预算传递路径写反方向，实际比设计描述的更简单**：`budget_ms` 是 `__init__` 构造参数（`client.py:88-93`）而 `remaining_ms()` 每条不同，走它需每条重建 client。核对 `client.py:99-111` 确认——**链共享预算语义 v0.1 本就正确实现**（每 provider 前算 `remaining = budget - elapsed`，`<=0` 记 `budget_exhausted` 并 break）。本迭代只需把 `news_l1.py:333` 的 `timeout_ms=inp.options.timeout_ms` 换成 `budget.remaining_ms()`，**一行**。AC-3.8 注的「v0.1 未传」应精确为「`budget_ms` 构造参数从未被使用（`build_ai_client()` 不传，`client.py:215`），`complete_json` 的 `timeout_ms` 一直在传」。
+  4. **中④`slice_for` 极小残值会发起必然超时的调用**：跳过闸门只有 `exhausted()`（`remaining<=0`），故 `remaining=300ms` 时不跳过 → `slice_for(15000)` 返 300ms → 调 KB 必然超时 → 按 AC-7.2 记为「工具故障」进 `degradations`。预算耗尽被误报成 xiaobao KB 挂了，灰度期最费时间的一类误报。需最小段阈值（如 1000ms）+ 跳过条件改用 `slice_for(...)==0`，统一记 `degraded:{tool}_budget_exhausted`。
+  5. **中⑤`l1_attempt` 递增时点在写回事务**，与 PRD AC-5.1「镜像值、同事务一并推进」不符：`tasks.attempt` 在 claim 事务 +1（§3.4 步骤 2），`l1_attempt` 在 §4.6/§4.7 才 +1 → claim 后崩溃（240s 窗口，最可能的崩溃点）两者永久差 1，xiaobao 侧看到的展示值失真。建议移入 claim 事务（§3.4 步骤 4 已在写 `raw_items`，成本为零），并删除写回/失败路径的重复递增。
+  6. **中⑥DB 写回失败直接丢弃结果，未做任何重试**：一条已花 240s 预算 + 一次 LLM 调用（含费用）的结果，因几毫秒的连接抖动或死锁被整个丢弃，条目还额外占队列 30 分钟；而写回事务是毫秒级、失败多为瞬时。与 §1.2「高可靠」准则不一致，且是 §7.1 八条取舍里**唯一没记录理由**的省力选择。建议有限重试 2 次（间隔 1s，仅对连接错误/死锁/序列化失败），且须在预算之外。
+  7. **低⑦⑧**：§6.1 正文「每步都跑黄金样本」与表格完成判据不一致（只有步 3 写了）；出向映射失败是确定性失败，可重试语义会白耗 3~5 次 × 240s，建议 §7.2 记一行 + 日志标注 `mapping_error` 子类型。
+  8. **指派项结论**：① 协议与 SQL——除问题 1 外可直接照写，两种 claim SQL 无歧义，`score_total`/`id` 不出现的约束写得足够醒目（§2.3「不是写 NULL，是根本不提及」是最易写错处）；② async 切分——五步自底向上正确，每层下游都已 async，不会出现同步/异步混用中间态；③ 黄金样本——四类覆盖到位，样本 ④ 点名 `httpx.TimeoutException` vs `asyncio.TimeoutError` 是本次改造最易静默变化处，§7.2 对 mock 保真度的自我质疑尤其到位；④ **工作量与 PRD §8 相符，未发现悄悄扩大范围**（协议分层的增量来自 §0 准则裁定 2 与 DevOps 发现 B，属已授权）。
+- 关联迭代：v0.2
+- 关联非迭代工作：无
+- 关联 Change Note：无（设计据 DevOps 实机发现 B 要求 PM 订正 PRD AC-8.2「不再恒空」，属 Architect 已提的 C-14 转达项）
+- 遗留问题/风险：① 问题 1 不修则实现阶段必卡 ② 问题 4/5/6 都属「不修也能跑通、但会在灰度期变成难查的现象」——误报工具故障 / 展示值漂移 / 结果丢失 ③ `domain_tags` 在 DB 模式实际恒为 `[]`（发现 B），DB 模式处理质量系统性低于 HTTP 模式且不报错，待 C-14 确认
+- 下一步入口：PM / DevOps 完成设计 R1 Review → Architect 按三方意见改 R2 → 设计定稿后进实现阶段（按 §6.1 五步 + 步 0 先录黄金样本）
+- 收尾状态：已收尾（Review 交付完成）
+
 ## 2026-07-27 — v0.2 PRD R4 复审（通过）
 
 - 本次角色：Developer

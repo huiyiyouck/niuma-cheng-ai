@@ -1,5 +1,43 @@
 # Architect 角色日志
 
+## 2026-07-28 — v0.2 设计 R2 定稿 + CN-005 确认（Architect）
+- 本次角色：Architect（架构师）
+- 动作：设计阶段 R2 三方复核收口 → **定稿前订正 7 条 → 设计定稿 → 进实现阶段**
+- 涉及文档：`docs/progress/iterations/v0.2-design.md`（§12 定稿前订正 + 定稿声明 + 文档状态/Review 状态表；正文 §2.6/§3.2/§3.6/§4.6/§4.10/§4.11/§4.12/§6.1/§6.2/§8 共 10 处）、`docs/progress/iterations/v0.2-cn-005.md`（本角色确认行）、`docs/progress/iterations/v0.2.md`（设计门禁置已定稿 + 实现阶段 R1 行与开工条件）、`docs/progress/INDEX.md`
+- 结论：**设计 R2 定稿**。三方复核全部通过——Developer 通过（2 中 2 低）、PM 通过·附条件（1 高 2 低，**三条全在 PRD 侧**）、DevOps 通过·附条件（1 高 2 中）。三方均明确**不需要出 R3**，故按 `standard-iteration-quick.md` §11 在定稿前一并订正，不推轮次
+- **DevOps 高①（附条件）是本轮最实质的一条，我接受并已落进设计**：`ItemBudget` 只覆盖处理阶段，**claim 与写回两个事务在所有预算之外**，全文 `connect_timeout`/`statement_timeout`/`lock_timeout` 零命中。而 §4.6 我自己写的「重试总耗时 ≤2s」**只在每次重试立即失败时成立**——其触发条件里的 `deadlock_detected`/`serialization_failure` 本质就是锁等待，无 `lock_timeout` 时 PG 会无限等；写回三表时 xiaobao 的 1800s 回收可能正在 UPDATE 同一行 `tasks`，两侧对同一行的写竞争是这套契约的固有面。**我给处理阶段设了 240s 封顶，却默认了「数据库操作总是快的」——一处真实的算式漏项。** 已按 `statement_timeout=8s`/`lock_timeout=5s` 收敛（最坏 `2×(8+1)=18s ≤ 20s` 收尾余量，无需改动已定的 260/280），定义 `DB_OP_BOUND` 与两条不等式进启动门禁，池初始化在**与隔离级别断言同一处**设置
+- **Developer 中①（黄金样本与 AC-7 的边界）是第二实质的一条**：步 3 同时做两件目标相反的事——async 改造要求**行为不变**（判据是黄金样本逐字段比对），而并入的 AC-7 三分支修复是**有意改变行为**（空结果不再进 `degradations`，而它经 `normalize_output_node:371` 落进 `tags.processing`，正是样本 ② 的关键断言字段）。只要样本含一个空结果场景，比对必然失败，而那是预期变更不是回归——实现会话会面对一个红色基线却无法判断该改代码还是改样本。已写成硬约束：**四类样本均不得含「工具成功但无结果」场景**，该场景由测试 17 独立覆盖、期望值是改造后的新语义；§6.1 步 3 唯一允许的行为变更就是 AC-7 三分支
+- 其余 5 条订正：§8 测试 8 的 `error_kind` 漏改（`timeout` → `budget_exhausted`，而该项正是验证 CN-004 那条订正的测试）；§3.2 旁注「四个方法」→「五个」；预算跳过时 `tool_budget_used` 与 `tool_summary` 口径一致均不递增（否则白吃一次工具配额并影响后续路由）；§3.6 补「`dead` 在 v0.2 无自动消费方」（`Restart=on-failure` 只看进程退出码，协程死亡时进程仍存活）；§4.12 日志落盘按已落地的 journal 方案订正。**测试项 24 → 26**
+- CN-005 确认：六条全同意。PM 认领了 AC-5.7「三层配一致值」的表述责任（源自 CN-003 逐字搬用 DevOps R3 措辞），该句与设计 §4.8 冲突且**错在 PRD**——验收标准的字面就是实现依据，照它配三个相等值会完全符合验收却踩边界竞态，且**只在恰好用满宽限期时触发、自测几乎必不复现**
+- 设计定稿状态：六项开放问题 O-2/O-3/O-6/O-8/O-9/O-10 全部落定 + ADR-0003/0004；三项遗留**均不阻塞实现开工**（C-6 实证待发现 A 闭合、测试 20 同前置、O-11 灰度期观察）
+- 遗留问题/风险：发现 A（xiaobao `tasks` 无 `l1_ai_process` 记录）仍未闭合，卡着 C-6 实证与 AC-10.2；O-11 吞吐（340~920 条/天 vs 未知日增量）待灰度期验证；出向映射失败按可重试处理是确定性失败，若灰度期实际发生由 PM 走 Change Note 改判
+- 下一步入口：**切 Developer 进实现阶段**，第一动作是 §6.1 步 0 录制四类黄金样本（遵守 §6.2 边界声明）；实现 R1 的 Review 方为 Architect、DevOps
+
+## 2026-07-28 — v0.2 设计 R2（按三方 R1 意见修改，Architect）
+- 本次角色：Architect（架构师）
+- 动作：设计阶段 R1 三方 Review 收口 → 出 **R2**
+- 涉及文档：`docs/progress/iterations/v0.2-design.md`（正文 15 处修改 + 新增 §4.11/§4.12/§11，测试项 16→24）、`docs/progress/iterations/v0.2.md`（设计阶段 R2 行）、`docs/progress/INDEX.md`（当前阶段 + 下一步入口）；核对 `v0.2-cn-004.md`（PM 已落地 PRD）、DevOps 的 `deploy/` 与 ad-hoc
+- 结论：**三方共 15 条全部处置，无一驳回；架构方向未变**（三方一致判「无方向性分歧」）。Developer 8 条 / PM 4 条 / DevOps 4 条（含 1 条与 CN-004 的 `error_kind=budget_exhausted` 对齐）
+- 两条覆盖缺口（PM 提，均为我 R1 的遗漏）：**新增 §4.11** AC-7 三工具「空结果 / 调用故障 / 预算跳过」三分——PM 的关键观察是它与 §4.5 deadline 要改的是**同三行代码**（`news_l1.py:150/179/213` 的 `if result.ok and result.items:`），分两次改会把三种情形混进同一个 `else`，而分开正是 AC-7 的全部要点，故 §6.1 步 3 合并一次改完；**新增 §4.12** AC-6 日志（R1 只落 2/6），含字段表、注入方式、AC-6.6 降级冗余、`budget_exhausted` 与 `timeout` 分记，并加 `budget_remaining_ms` 字段供灰度期定位预算被谁吃掉
+- 四条跨层/协议缺陷：`PullSource` 补 `release`（§4.2 已调用但协议没定义 → 实现会撞 `AttributeError`；且停机释放不得复用 `mark_failed`，否则污染 `attempt`、白耗一次重试配额）；**三层停机时限由「配一致值」改为逐层放大**（应用 260s ≤ ASGI < systemd 280s——三者语义不同，取相等值会在 worker 恰好用满宽限期完成写回时被同刻 SIGKILL，COMMIT 前被杀留残留锁，正是整条停机链要防的事）；**三层强制点记明在部署脚本**（应用读不到自身 systemd 配置，`N` 调大时应用侧校验全绿而 systemd 照杀）；启动自愈改为失败不 fail-fast（自愈只是加速自己那部分，xiaobao 1800s 会兜底，为加速项失败而拒绝服务取舍是反的）
+- 四条实现精度：LLM 预算改走 `complete_json(timeout_ms=)` 按次入参而非构造参数（**实为一行改动**）；`slice_for` 加 `MIN_SEGMENT_MS`（残值 300ms 会发起必然超时的调用并被记成工具故障，污染观测面）；`l1_attempt` 递增移入 claim 事务（否则 claim 后崩溃会与 `tasks.attempt` 永久漂移）；写回失败补有限重试（已花掉 240s 预算 + 一次 LLM 调用的结果，不该因几毫秒抖动整个丢弃）
+- **三条我特别认同、已记入设计 §11 供复盘**：① Developer 中③——我 R1 写「实传给 `ChainedAIClient(budget_ms=)`」时只核到「构造参数没被传」，没往下核 `complete_json` 的按次 `timeout_ms` **本就是链的总预算**、且链内递减 v0.1 早已正确实现，按我原文实现会多绕一圈无用改造，是「核到一半就下结论」的典型 ② DevOps 高②——我把不变式写进启动门禁时默认了「门禁能管住所有相关的量」，而它管不到进程外的配置，这条漂移路径我完全没想到 ③ PM 高①——AC-7 零落点是我的覆盖遗漏，而其指出的「与 deadline 落在同一段代码」的交汇点，直接决定了 §4.11 与 §6.1 步 3 必须合并
+- 遗留问题/风险：设计 R2 待三方复核；C-6 实证与 AC-10.2 端到端均卡在 **发现 A 闭合**（xiaobao 补建 `l1_ai_process` task 行）；O-11 吞吐观察项已挂 CN-004，灰度期须看队列长度趋势；出向映射失败按可重试处理是确定性失败，若灰度期实际发生由 PM 走 Change Note 改判
+- 下一步入口：三方复核设计 R2（分工见文档 §Review 状态）；通过后进实现阶段，按 §6.1 五步切分（步 0 先录黄金样本，步 1/2/4 也须比对）
+
+## 2026-07-28 — v0.2 设计 R1 出稿 + CN-003 确认（Architect）
+- 本次角色：Architect（架构师）
+- 动作：确认 CN-003 → 进入标准迭代**设计阶段**，产出设计 R1 与两份 ADR
+- 涉及文档：**新建** `docs/progress/iterations/v0.2-design.md`、`docs/knowledge/decisions/0003-datasource-protocol-by-responsibility.md`、`docs/knowledge/decisions/0004-item-wall-clock-budget-and-batch-size.md`；**更新** `docs/knowledge/INDEX.md`（ADR 登记）、`docs/progress/iterations/v0.2-cn-003.md`（本角色确认行）、`docs/progress/iterations/v0.2.md`（设计阶段 R1 行）、`docs/progress/INDEX.md`（当前阶段 + 六项落定）
+- 设计准则（Owner 2026-07-28 重申）：**按最健全而非最省力的方式设计——高可用、高可靠、高复用**。已写入设计文档 §1.2 并展开为三维落点表；§7.1 逐条记录「更省力的做法是什么、为什么不选」共 8 条，使准则可被 Review 检验而非停留在口号
+- **六项开放问题全部落定**：**O-2** 协议按职责分层（`L1Mapper` 两模式真实实现 + `PullSource` 仅 DB 实现，HTTP 不假装实现）+ 源类型适配器注册表；判据改为「静态 grep 零命中 + 动态双控制流」→ ADR-0003。**O-3** 单条 wall-clock 预算 240s + **N=1** + 轮询 15s + 宽限期 260s → ADR-0004。**O-6** 三段式 + 连接随事务获取释放 + 启动期断言 `READ COMMITTED`。**O-8** 自底向上五步、步 0 先录黄金样本、纯计算节点保持同步、`CancelledError` 不得吞。**O-9** psycopg3(async)。**O-10** `locked_by={worker_id}#{run_token}` 两段式
+- **本轮最重要的判断：N 由 PRD 暂定的 8 改为 1**（PRD AC-3.6 已授权 O-3 重算）。论证：v0.2 批内串行下 N>1 **零吞吐收益**（8 条串行 = 逐条 claim 8 次，多出的仅 7 次毫秒级事务），却把持锁时长与**崩溃影响面**同时放大 N 倍（worker 处理第 1 条时崩溃，其余 N-1 条根本没被处理却同样被锁 30 分钟）；且 `8 × 240s = 1920s > 1800s` 用本设计的预算值直接违反 AC-3.6。配置项保留 + 不变式校验，v0.3 并发化后可上调——不是删能力，是把默认值放在正确位置
+- 其余关键设计：`ItemBudget.slice_for()` 实现「预算覆盖 pipeline 全程」（三工具段上限由 180s/8s/180s 收紧为 15s/8s/20s，仅占预算 18%，其余留给 LLM 及 fallback 链，并**补上 v0.1 未实传的 `ChainedAIClient(budget_ms=…)`**）；`add_done_callback` + `task.exception()` 解 worker task 静默死亡（我 R3 高④的直接实现）；`lock_token` 两段式同时满足「能自愈自己上次的锁」与「多实例互不误伤」
+- **据 DevOps 同日实机发现调整设计（实机数据优先于文档假设）**：**发现 B** 实测 `l0_label` 全库只有 `direct_display` 一个非空取值、是流程标记而非领域分类 → **推翻 PRD C-1 闭合结论与 AC-8.2「不再恒空」**；照字面映射会把零信息量真值噪声塞进 prompt 与 KB 检索过滤（比恒空更糟，`or None` 拦不住）。设计采用**排除集**而非「一律置空」或黑名单硬编码——理由：一律置空会让对方将来启用真实分类时 ai 无声失效，排除集能自动跟上。**发现 A** `tasks` 中 `l1_ai_process` 记录为 0 → 不改 claim 设计（C-5 边界仍正确），但暴露观测盲区「队列真空」与「有货无 task」同形 → 新增 `consecutive_empty_polls` + 阈值 WARN + `/health` 暴露，**只报告自身状态、不查 `raw_items`**，不违反「不做孤儿探测」
+- CN-003 确认意见：同意全部 12 条，并指出**变更 1 的价值高于我自己那条附条件**——DevOps 抓的是我 R3/R4 两轮都漏掉的根因：我核了 `N × 79s` 这个不等式的**形式**，却没核 79s 这个**输入**是否被机制保证
+- 遗留问题/风险：C-6 实证待发现 A 闭合后执行（**不阻塞设计定稿**，两种 claim 写法均已给出，实证只决定选哪个）；C-11（`priority` 方向）/ C-13（URL 前缀）/ **C-14（`l0_label` 语义，本轮新增）** 待 PM 转达；`locked_by` 格式须知会 xiaobao 确认不与其 1800s 回收冲突；预算 240s 是估计值，灰度期按 `duration_ms` 分布复核
+- 下一步入口：设计 R1 由 PM / Developer / DevOps 三方 Review（分工见设计文档 §Review 计划）；定稿后进实现阶段，按 §6.1 五步切分推进（步 0 先录黄金样本）
+
 ## 2026-07-27 — v0.2 PRD R4 复审（Architect）
 - 本次角色：Architect（架构师）
 - 动作：标准迭代 PRD 阶段 R4 复审（Developer 同日已复审并**通过**；DevOps 待复审）
