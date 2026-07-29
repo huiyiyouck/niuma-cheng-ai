@@ -1,5 +1,18 @@
 # Architect 角色日志
 
+## 2026-07-28 — 据 xiaobao C-11~C-14 答复更新已定稿设计 + KB 鉴权拍板（CN-006）
+- 本次角色：Architect（架构师）
+- 动作：跨仓核对 xiaobao 三方答复 → 更新已定稿设计（轻量变更，不回设计阶段）→ 出 **CN-006**
+- 涉及文档：**新建** `docs/progress/iterations/v0.2-cn-006.md`；**更新** `v0.2-design.md`（§2.1/§3.3 整节重写/§3.4/§4.13 新增/§7.2/§8/§10/§13 新增）、`v0.2.md`（Change Notes 表）、`docs/progress/INDEX.md`；**只读核证** coordination `contracts/news-l1-db.md` v1.5 + `communications/REQ-003` 最近 7 帖
+- 触发：设计 R2 定稿**当日**，xiaobao 三方把 ai 转达的 C-11~C-14、发现 A、日增量全部答复完毕，契约升 v1.5
+- **最实质一条（C-14）：`domain_tags` 真源是 `sources.domain_tags`，不是 `l0_label`**——对方 Architect **主动撤回其 v1.3 的错误结论**并追出 HTTP 模式完整取数链路（`sources.domain_tags → l1-processor.ts:243/257-278 → ai-hub.ts:45`），确认 `L1Input.domain_tags` 从来不是 L0 产物而是**源级静态标签**；`GRANT SELECT (domain_tags, attention_level) ON sources` 已双库执行 verify。**后果是好消息**：DB 模式取到该列后与 HTTP 模式**同字段同数据、完全等价**，「`domain_tags` 恒为 `[]`」的已知差异**整条消失**。§3.3 整节重写（归一化对齐对方 `l1-processor.ts:257-278`），**原排除集方案作废**——它建立在「`l0_label` 是 `domain_tags` 对应物」这一已撤回前提上
+- 其余七条：**C-6 行锁实证通过**（`FOR UPDATE SKIP LOCKED` 在列级 GRANT 下可行）→ claim 定**写法 A**，写法 B 降为 v0.3 权限收紧时的备用退路，**但仍须自测多 worker 并发不重复**（对方实证只覆盖权限、未覆盖并发语义）；**发现 A 闭合**（对方认领系其造数脚本只 reset `raw_items` 未建 task，已补建 5 条 + 订正为幂等）→ 测试 20 前置解除；C-11 `priority` 数值大=优先（我的假设正确，次级排序用 `run_after` 被评价为更合理）；C-13 URL **确不保证**前缀，我的规范化方案被评价为「比我方加清洗更合适」；C-5 事务已落地、「`queued` 必有 task」成强承诺；C-12 对方**已改读列**、两侧同源，我实测的 `max_attempts=5` 是 v0.6 遗留 `l1_process` 行（新建 `l1_ai_process` 为 3）——**ai 侧「读列 + 越界取末值」的结论与防御均不变**（列值可配，防御不因当前为 3 而多余）；O-11 日增量实测 15~30 条/天、**5~10 倍余量**，v0.3 无需前移
+- **Architect 拍板项：KB 检索定为方案 A（同机直连、不用任何 token）**，新增设计 §4.13。对方 DevOps 澄清 `/v1/kb-search` 鉴权 = `ADMIN_TOKEN` 或 IP 白名单、且**后端不存在 `KB_ADMIN_TOKEN` 这个 env**，把选择权交架构。定 A 的核心理由是**最小权限**——唯一可用的是其**全权** token，下发即授予 ai 所有 admin 写接口权限（改源/删空间/同步规则），不可接受；而同机直连零凭据、零改动（`tools/kb.py:38-40` 本就「env 空则不发头」）。**部署约束**：唯一前提是同机，将来分机须请对方加**独立只读 KB token**，不得复用全权 token
+- **范围纪律**：对方建议 `l0_label` 可作处理优先级信号用于 `needs_context` 判定（呼应 Q-1）——**这是新能力，不在 v0.2 范围，登记 v0.3 候选，本迭代不做**。不因为对方提了个好主意就扩范围
+- 变更级别判定：八条全部是**外部事实变化**，不改产品范围/主流程/架构方案/对外契约，验收侧均为**收紧或消解**（不放宽任何一条）→ 按 §11 属**轻量变更**，走 CN-006，**不回设计阶段**
+- 遗留问题/风险：CN-006 待三方确认；**PM 侧连带动作** —— 撤回 PRD AC-8.2 的 `domain_tags` 差异条 + 作废 CN-004 变更 1（其前提已被对方撤回）；KB 分机部署风险已登记 §7.2
+- 下一步入口：Developer 进实现阶段（§6.1 步 0 先录黄金样本）；测试 20 现已可跑
+
 ## 2026-07-28 — v0.2 设计 R2 定稿 + CN-005 确认（Architect）
 - 本次角色：Architect（架构师）
 - 动作：设计阶段 R2 三方复核收口 → **定稿前订正 7 条 → 设计定稿 → 进实现阶段**
