@@ -1,5 +1,20 @@
 # Developer 角色日志
 
+## 2026-07-30 — CN-006 受影响角色确认（Developer）
+
+- 本次角色：Developer
+- 动作：Change Note 确认（非 Review 轮次——不评判方案，只核实变更对实现的影响与其中的技术断言）
+- 涉及文档：`docs/progress/iterations/v0.2-cn-006.md`（填本角色确认意见）；核对 `src/agent_hub/tools/kb.py:32-48`、设计 §3.3 / §3.4 / §8 测试 11/20
+- 结论：**已确认，同意**。三条变更全部落在实现依据上（入向映射数据源、claim SQL 写法定选、KB 配置），故本确认有实质内容而非流程形式；三处技术断言逐一核实**均成立**：
+  1. **变更 3「KB 零代码改动」成立**：`kb.py:37-40` 是 `token = getenv("KB_ADMIN_TOKEN","").strip()` + `if token: headers[...]`，不配置该 env 即不发头。禁止下发 xiaobao 全权 `ADMIN_TOKEN` 我完全同意——只读检索需求换来改源/删空间/同步规则的写权限，完全不成比例。
+  2. **变更 1 归一化成立**：`if not isinstance(raw, list): return []` 覆盖实机存在的 `{}` object 形态。**DevOps 的实机订正是我最关心的一条**：`{}` 是 falsy，若「优化」成 `raw or []` 恰好蒙对而 `{"a":1}` 会漏 → pydantic 校验失败 → `MappingError(client_error)` → 不可重试 `final_failed` → 5 条冒烟一次报废。实现照 `isinstance` 写，不做等价改写。
+  3. **变更 2 成立且强于 CN 表述**：CN-006 写「对方只验权限侧、仍须自测并发」，但设计 §3.4 显示 ai DevOps 已补齐并发侧（两会话 claim 拿到不同行、`SKIP LOCKED` 生效、全程 `ROLLBACK` 未耗队列）→ C-6 为两侧各验一半的完整闭合。按写法 A 实现，写法 B 留作权限变更退路。
+- 关联迭代：v0.2
+- 关联 Change Note：CN-006（本条）；其 PRD 侧连带动作由 CN-007 完成
+- 遗留问题/风险：**§3.4 待确认 6j 是实现期最需盯的一条**——契约 C-2 的 `tasks.status` 枚举为 `running`，xiaobao 的 C-6 实证 SQL 写 `processing`，而 `tasks` 无 CHECK 约束，**写错不报错、只表现为对方状态不动**。按设计取 `running`，冒烟时把「对方状态是否随之推进」列为必查项，不靠无报错判断正确。
+- 下一步入口：三方确认已齐（PM / Developer / DevOps 均 2026-07-30 确认）→ 待 PM 勾选执行状态并登记 `v0.2.md` Change Notes 表 → 实现阶段开工（§6.1 步 0 先录黄金样本）
+- 收尾状态：已收尾
+
 ## 2026-07-28 — v0.2 设计 R2 复审（通过）
 
 - 本次角色：Developer
