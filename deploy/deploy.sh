@@ -77,10 +77,14 @@ if [ "$GRACE_SEC_ENV" != "$GRACE_SEC_EXPECT" ]; then
 fi
 
 # 托管层必须【严格大于】应用层——逐层放大，不是相等（DevOps Review 问题 1）
-for unit_file in /etc/systemd/system/niuma-ai-worker@.service /etc/systemd/system/niuma-ai-http@.service; do
-  [ -f "$unit_file" ] || continue
+UNIT_CHECKED=0
+for unit_file in /etc/systemd/system/niuma-ai-worker@.service; do
+  if [ ! -f "$unit_file" ]; then
+    echo "  ⚠ $(basename "$unit_file") 尚未安装到 /etc/systemd/system——**托管层未校验**"
+    continue
+  fi
   TSS=$(grep -E '^TimeoutStopSec=' "$unit_file" | cut -d= -f2)
-  case "$unit_file" in *worker*) MIN=$GRACE_SEC_EXPECT ;; *) continue ;; esac
+  MIN=$GRACE_SEC_EXPECT
   if [ "$TSS" -le "$MIN" ]; then
     echo "!! $(basename "$unit_file") 的 TimeoutStopSec=${TSS}s 未严格大于应用层宽限期 ${MIN}s" >&2
     echo "   相等会在边界产生竞态：worker 恰好用满时 systemd 同时 SIGKILL，写回可能在 COMMIT 前被杀 → 残留锁" >&2
@@ -88,20 +92,39 @@ for unit_file in /etc/systemd/system/niuma-ai-worker@.service /etc/systemd/syste
     exit 1
   fi
   echo "  ✓ $(basename "$unit_file"): TimeoutStopSec=${TSS}s > 应用层 ${MIN}s"
+  UNIT_CHECKED=1
 done
-echo "  ✓ 三层关系：应用 ${GRACE_SEC_EXPECT}s ≤ ASGI ${GRACE_SEC_ENV}s < systemd"
+if [ "$UNIT_CHECKED" -eq 1 ]; then
+  echo "  ✓ 三层关系完整校验通过：应用 ${GRACE_SEC_EXPECT}s ≤ ASGI ${GRACE_SEC_ENV}s < systemd"
+else
+  echo "  ✓ 应用层与 ASGI 层一致（${GRACE_SEC_EXPECT}s）；**托管层待装 unit 后由本脚本校验**"
+fi
 
 echo "==== [5/6] 重启服务 ===="
 systemctl daemon-reload
 # RUN_MODE 由 unit 决定（见 unit 内 Environment=RUN_MODE），此处按启用状态重启
+RESTARTED=0
 for unit in "$WORKER_UNIT" "$HTTP_UNIT"; do
   if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
     echo "  restart $unit"
     systemctl restart "$unit"
+    RESTARTED=1
   else
     echo "  跳过 $unit（未 enable）"
   fi
 done
+
+# 首次部署时 unit 尚未安装/enable，此时没有任何服务在跑，健康检查必然失败。
+# 那不是部署失败，是「代码与环境已就位、等待装 unit」这个中间态。
+if [ "$RESTARTED" -eq 0 ]; then
+  echo "==== [6/6] 跳过健康检查 ===="
+  echo "  未有已 enable 的 unit——代码与运行环境已就位，请先安装并启用 unit："
+  echo "    cp $SRC/deploy/systemd/niuma-ai-*@.service /etc/systemd/system/"
+  echo "    systemctl daemon-reload && systemctl enable --now niuma-ai-http@$ENV_NAME"
+  echo "  装好后重跑本脚本即可完成验证。"
+  echo "==== 部署完成（未启动服务）: $ENV_NAME @ $(git -C "$SRC" rev-parse --short HEAD) ===="
+  exit 0
+fi
 
 echo "==== [6/6] 部署后验证 ===="
 PORT=$(grep -E '^PORT=' "$RUN/systemd.env" | cut -d= -f2)
