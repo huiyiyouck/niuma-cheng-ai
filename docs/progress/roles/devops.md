@@ -1,5 +1,22 @@
 # DevOps 角色日志
 
+## 2026-07-30 — 托管化实际落地（B1）+ 旧 `.env` 权限收紧（B3）
+
+- 本次角色：DevOps
+- 动作：Ops Task（systemd 托管落地 / 沙箱与优雅停机实测 / 部署脚本缺陷修复 / 凭据文件权限收紧）
+- 涉及文档：`deploy/deploy.sh`（修两处首次部署缺陷，commit `88bd404`）、`docs/progress/INDEX.md`、本日志
+- 结论：**托管化已实际落地并全面验证通过。**
+  - **B3**：`/root/Project/niuma-cheng-ai/.env` 权限 `644 → 600`（内含 `VOLC_API_KEY` / `TAVILY_API_KEY`，该机同时跑 xiaobao 生产与 workboard）；v0.1 服务未受影响（`/health` 仍 200）。
+  - **B1**：建专用系统用户 `niuma-ai`（uid 999，`nologin`）；运行目录 `/srv/niuma-ai/test`（与 git 工作区分离，`.env` 天然仓外）；两个 unit 装入 `/etc/systemd/system`，**`niuma-ai-http@test` 已 enable 并运行于 8102**（与 v0.1 的 8100 **并存互不干扰**，未动 v0.1）；`niuma-ai-worker@test` 已安装**未 enable**，等 v0.2 worker 代码实现。
+  - **验证全绿**：`/health` 200；运行身份 `niuma-ai` 非 root；沙箱项 `NoNewPrivileges=yes` / `ProtectSystem=strict` / `ProtectHome=yes` / `PrivateTmp=yes` 全部生效，**实测 `sudo -u niuma-ai touch /etc/...` 被拒**；journal 正常收日志（`SyslogIdentifier` 生效）；优雅停机 **136ms**（远快于 `TimeoutStopSec=90s`）；重启后 200；**重跑 `deploy.sh` 三层停机时限校验完整通过**（`TimeoutStopSec=280s > 应用层 260s`）。
+- 关联迭代：v0.2（托管化经 Owner 2026-07-28 拍板纳入，CN-005 变更 1）
+- 关联非迭代工作：`ad-hoc/2026-07-28-ops-server-env-and-credential.md` §6 部署方案（本次即其落地）
+- 关联 Change Note：CN-005（变更 1 托管化范围）
+- **本次修掉自身脚本两处缺陷**（`88bd404`）：① 首次部署时 unit 尚未 enable，第 6 步健康检查必然失败并 `exit 1`——那不是部署失败而是「代码已就位、等待装 unit」的中间态，改为跳过并打印装 unit 指引后正常退出；② 三层校验在 unit 未安装时跳过托管层，却仍打印「应用 ≤ ASGI < systemd」，读起来像三层都验过了——改为区分「完整校验通过」与「托管层待装 unit 后再校验」两种输出。**两处都是实机跑一遍才暴露的，纸面 review 看不出来。**
+- 遗留问题/风险：① **v0.1 服务仍在 8100 运行未动**（pid 3026041，已 28 天）——按我建议的路径「先建新环境不动旧的，v0.2 灰度通过后再迁移停旧」，**待 Owner 决定何时停** ② 实测 `ExecMainStatus=15`（SIGTERM 信号号），即 uvicorn 是被信号终止而非自主 `exit 0`；HTTP 模式无状态无妨，但 **worker 模式下应确保 lifespan 正常收尾后自主退出 exit 0**，否则与 `Restart=on-failure` 的语义配合不够干净（`systemctl stop` 场景 systemd 不会重启，故当前不构成问题；属实现阶段注意项）③ CN-005 的两个 DB 超时默认值仍待 PM/Architect 订正 ④ 6i / 6j 待 xiaobao ⑤ 部署就绪检查通过条件定义仍缺（归我，排部署阶段）。
+- 下一步入口：Owner 定 v0.1 服务何时停；PM/Architect 落实 CN-005 默认值订正 → 设计定稿 → 实现阶段；worker 代码就绪后 `systemctl enable --now niuma-ai-worker@test`。
+- 收尾状态：已收尾
+
 ## 2026-07-30 — 确认 CN-003~CN-007 五个 Change Note（发现启动门禁级算术错误）
 
 - 本次角色：DevOps
