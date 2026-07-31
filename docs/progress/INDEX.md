@@ -66,6 +66,7 @@
 
 | 日期 | 角色 | 工作 | 结论 | 下一步入口 |
 |------|------|------|------|------------|
+| 2026-07-30 | DevOps | 确认 CN-003~CN-007 五个 Change Note（**发现一处会卡住启动的算术错误**：`DB_OP_BOUND` 公式算出 27s 而文档写 18s，该条是启动门禁、按现默认值 worker 起不来；根因是我设计 R2 给的算式漏算首次尝试，三方同错）；**托管化实际落地**（专用用户 `niuma-ai` + `/srv/niuma-ai/test` + unit 安装启用于 8102，沙箱/日志/优雅停机/完整部署链路全绿，v0.1 未受影响）；旧 `.env` 权限 644→600；`deploy.sh` 修两处首次部署缺陷 | 已收尾。五个 CN 均已写入 DevOps 确认（3 直接 + 2 附条件）；托管化验证全绿 | **PM/Architect 落实 CN-005 两个 DB 超时默认值订正**（`8000→5000`/`5000→3000`，不改则实现阶段首次启动即被门禁拦下）；Developer 补确认 CN-003/004/007；xiaobao 回应 6i/6j；Owner 定 v0.1 服务何时停 |
 | 2026-07-04 | PM | 迭代关闭检查 + 收尾归档：修 test-report 小问题（Architect 状态表 / 36→40 passed）、v0.1 部署就绪 + 关闭归档区、CN-001/CN-002 归档、生成 v0.1-summary.md、更新 INDEX、更新 PM 日志、coordination REQ-001 置已关闭 | v0.1 已关闭 | v0.2 立项（PM，待 Owner 确定范围）；部署阶段 DevOps 托管化 + 多 provider |
 | 2026-07-04 | Developer | 收尾铺写：同步 test-report 元信息（40 passed / 文档定稿 / D-1 闭环 / D-3 登记）、v0.1.md 部署就绪检查与迭代关闭归档、INDEX.md 状态、Developer 日志；核实 coordination 联调文档完整（2026-07-04 端到端 4 条用例通过，Owner 抽样验收通过）；区分 Developer 代码侧（logging/耗时）vs DevOps 运维侧（托管化/多 provider）发布检查项归属 | 已收尾（Developer 侧铺写完成） | Owner 同步验收状态并触发迭代关闭检查；R2/下一迭代处理发布检查项 + Architect 观察项 + D-2/D-3 |
 | 2026-07-04 | DevOps | 实现 R1 Review（部署 / 环境变量 / 密钥注入 / 健康检查 / 发布风险 / 回滚条件）：两方通过，实现 R1 定稿；4 条发布检查项跟踪到部署阶段 | 已收尾（实现 R1 定稿） | Owner 验收；部署就绪检查处理 4 条发布检查项 |

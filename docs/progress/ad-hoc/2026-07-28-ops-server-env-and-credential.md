@@ -6,7 +6,7 @@
 - 执行角色：DevOps（运维/部署工程师）
 - 是否进入迭代：是（v0.2 的「实现阶段开工前置」两项，PRD R4 §5 待办，INDEX 跨任务待办 P0）
 - 关联迭代：v0.2（PRD R4 已定稿，进设计阶段）
-- 当前状态：**两项均已完成**；附带发现 2 项阻塞/高风险问题，其中 1 项**阻塞 C-6 行锁实证**
+- 当前状态：**已完成并收尾**（2026-07-30）。两项前置已完成；附带发现的 2 项问题**均已闭合或已转跨项目待跟进**（发现 A → xiaobao 补建 task 已修复、C-6 完整闭合；发现 B → 转 coordination 6i，ai 侧已自行兜底）；**§6 部署方案已于 2026-07-30 实际落地并验证通过**（见下方「落地实录」）。
 
 ## 背景
 
@@ -319,3 +319,38 @@ v0.1 服务（pid 3026041，`/root/Project/niuma-cheng-ai`，nohup 起、无托�
 3. `/root/Project/niuma-cheng-ai` 回归为纯开发/构建目录（或直接废弃，构建源已在 `/opt`）。
 
 **不建议现在停 v0.1**——它可能仍在为 xiaobao 的 HTTP 模式提供 L1 处理，停机前需确认 xiaobao 侧调用情况（属跨项目确认，走 PM）。
+
+---
+
+# 七、§6 方案的落地实录（2026-07-30）
+
+Owner 2026-07-28 拍板托管化纳入 v0.2（CN-005 变更 1）后，§6 方案已实际执行完毕。
+
+| 步骤 | 结果 |
+|---|---|
+| 建专用系统用户 | `niuma-ai`（uid 999、`nologin`、无 home） |
+| 运行目录 | `/srv/niuma-ai/test`，与 git 工作区 `/opt/niuma-cheng-ai` 分离 → `.env` 天然仓外 |
+| 配置双文件 | `.env`（600，含 DB 口令 + LLM 凭据）/ `systemd.env`（`PORT=8102`、`SHUTDOWN_GRACE_SEC=260`） |
+| unit 安装 | 两个模板 unit 装入 `/etc/systemd/system`；**`niuma-ai-http@test` 已 enable 并运行**；`niuma-ai-worker@test` 已装**未 enable**（等 v0.2 worker 代码） |
+| 端口 | **8102**，与 v0.1 的 8100 并存互不干扰 |
+
+**验证结果（全绿）**：
+
+| 验证项 | 实测 |
+|---|---|
+| `/health` | 200 |
+| 运行身份 | `niuma-ai`，**非 root** |
+| 沙箱 | `NoNewPrivileges` / `ProtectSystem=strict` / `ProtectHome` / `PrivateTmp` 均生效；**实测 `sudo -u niuma-ai touch /etc/...` → Permission denied** |
+| 日志 | journal 正常收（`SyslogIdentifier` 生效），无需 logrotate |
+| 优雅停机 | **136ms**（远快于 `TimeoutStopSec=90s`） |
+| 完整部署链路 | 重跑 `deploy.sh` 全程通过，**三层校验完整跑**：`TimeoutStopSec=280s > 应用层 260s` |
+| v0.1 服务 | 未受任何影响 |
+
+**两处纸面 review 看不出、实机才暴露的缺陷（已修，commit `88bd404`）**：
+
+1. **首次部署的 chicken-and-egg**：unit 尚未安装时，`deploy.sh` 第 6 步健康检查必然失败并 `exit 1`。但那不是部署失败，而是「代码与环境已就位、等待装 unit」的合法中间态。已改为跳过健康检查 + 打印装 unit 指引后正常退出。
+2. **三层校验的误导性输出**：unit 未装时跳过了托管层校验，却仍打印「应用 ≤ ASGI < systemd」，读起来像三层都验过。已改为区分「完整校验通过」与「托管层待装 unit 后再校验」。
+
+**一处留给实现阶段的观察**：实测 `ExecMainStatus=15`，即 uvicorn 是被 SIGTERM 终止而非自主 `exit 0`。HTTP 模式无状态无妨；但 **worker 模式应确保 lifespan 收尾后自主退出 `exit 0`**，与 `Restart=on-failure` 的语义配合才干净（`systemctl stop` 场景 systemd 不会重启，故当前不构成问题）。
+
+**知识沉淀的去向**：本次可复用经验（三层停机时限、沙箱项、journal vs 文件日志、双配置文件分工）已写入 [`deploy/README.md`](../../../deploy/README.md) 的「关键配置为什么是这个值」表——**与部署配置放在一起、改配置时必然看到**，故不再在 `docs/knowledge/devops/` 另建一份，避免双份真源漂移。
