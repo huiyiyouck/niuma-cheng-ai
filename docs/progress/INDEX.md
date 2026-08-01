@@ -117,6 +117,7 @@
 | P2 | v0.2 顺延项 ③RunRecord 持久化：与 v0.2 的 `processed_news`/`tasks` 写回存在职责重叠，待 DB 模式落地后重估还缺哪些审计信息 | Architect | v0.1 下一步入口 / 2026-07-25 v0.2 范围重排 | 待启动（排 v0.3，需先重估范围） |
 | P1 | **部署就绪检查补一条：核对契约 `news-l1` v1.1 §服务端点与运行时坐标 所列坐标与实际部署一致**（六项：ai test/prod base URL、xiaobao kb-search test/prod base URL、`AI_INTEGRATION_MODE`、`RUN_MODE`）。**没有这条核对，该契约节会随时间烂掉、与不登记无异**——本迭代已见过同型（`AI_STALE_TIMEOUT_MS` 的 1800s 长期没人发现是错的，正因无任何机制会去读它一次）。另：ai prod base URL 待 v0.2 部署时由 DevOps 回填契约 | DevOps | Architect 2026-08-01 落契约 v1.1 时的连带要求（设计 §4.13） | 待办（灰度前完成） |
 | P2 | v0.2 顺延项 ④生产 ≥2 provider 真实 fallback 验证 | DevOps | v0.1 发布检查项 3 / 2026-07-25 v0.2 范围重排 | 待启动（部署阶段或 v0.3） |
+| P1 | **契约 `news-l1` v1.1 §服务端点的两个 DevOps 动作**：① **v0.2 部署 prod 时回填第 2 行**（ai `news-l1` prod base URL，当前「待 ai 回填」）② **每次部署核对六项坐标**（已落为部署就绪检查 **D6**）。该契约节由 ai DevOps 提议、Architect 落地（契约升 v1.1）——**登记只是第一步，没有定期核对的机制它会随时间烂掉、与不登记无异**（同型：`AI_STALE_TIMEOUT_MS` 的 1800s 长期没人发现是错的，正因没有任何机制会去读它一次） | DevOps | Architect 跨任务待办（`88563cb`）/ 源自 DevOps 8100 停机时提的结构性建议 | ① **待 v0.2 部署 prod**；② ✅ **已落地为 D6 判据并完成首次基线执行**（2026-08-01，六项实查见 D6 证据栏） |
 | P1 | ai↔xiaobao news-l1 真实数据端到端联调 + KB search 接入：① ai 测试环境部署、提供 `AI_HUB_BASE_URL`（`/health` 200，当前 127.0.0.1:8100 未运行）② 鉴权 token ③ 核对 `/v1/runs/news-l1` 与更新后 `contracts/news-l1.md` 一致 ④ 新接入 xiaobao `POST /v1/kb-search`（`x-admin-token`；v0.1 `tools/kb.py` 占位禁用、属新工作）⑤ 回填真实调用证据 | Developer | xiaobao 2026-07-01 响应（coordination `communications/REQ-001`、`contracts/kb-search.md`） | ✅ 已完成（2026-07-04，4 条用例通过，Owner 抽样验收通过，v0.1 已关闭；KB 空结果语义 D-3 待优化为非阻塞遗留，转入下一迭代） |
 
 ## Bootstrap 记录
