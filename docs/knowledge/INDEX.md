@@ -14,6 +14,9 @@
 
 ## DevOps（运维/部署）
 
+- [跨层约束的强制点选址：谁读得到两端，谁才能强制](devops/cross-layer-constraint-enforcement-point.md) — 约束的两端分属不同层时，强制点应放在能读到两端的最低层，而非写下约束的那一层；找不到这样的层则该约束无法强制，须显式登记为无保证项
+- [停服决策的证据标准：活跃连接数 0 不等于没人用](devops/service-decommission-evidence.md) — 批处理型调用方的连接数常态即为 0；判断依据应是请求日志的构成（总量+来源+时间分布）与调用方的配置指向
+
 ## Decisions（决策）
 
 - [ADR-0001: news-l1 采用确定性条件图编排](decisions/0001-news-l1-deterministic-conditional-graph.md)
