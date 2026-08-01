@@ -119,6 +119,9 @@ APP_STMT_MS=$(grep -E '^AI_DB_STATEMENT_TIMEOUT_MS=' "$RUN/.env" | cut -d= -f2- 
 APP_LOCK_MS=$(grep -E '^AI_DB_LOCK_TIMEOUT_MS=' "$RUN/.env" | cut -d= -f2- || true)
 APP_STMT_MS=${APP_STMT_MS:-4000}
 APP_LOCK_MS=${APP_LOCK_MS:-3000}
+# idle 在设计 §4.10 的 _configure 里是硬编码 '60s'（方案甲，护住对方 reclaim），
+# 不是配置项，故这里同样写死；若哪天它变成配置项，这里要跟着改。
+APP_IDLE_MS=60000
 
 if ! command -v psql >/dev/null 2>&1; then
   echo "  ⚠ 未装 psql，跳过——角色默认值无人校验"
@@ -130,7 +133,7 @@ else
   DB_PASS=$(grep -E '^AI_DB_PASSWORD=' "$RUN/.env" | cut -d= -f2- || true)
   ROLE_VALS=$(PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "${DB_PORT:-5432}" \
       -U "$DB_USER" -d "$DB_NAME" -tAq \
-      -c "SELECT name||' '||setting FROM pg_settings WHERE name IN ('statement_timeout','lock_timeout') ORDER BY name;" \
+      -c "SELECT name||' '||setting FROM pg_settings WHERE name IN ('statement_timeout','lock_timeout','idle_in_transaction_session_timeout') ORDER BY name;" \
       2>/dev/null || true)
   unset DB_PASS
   if [ -z "$ROLE_VALS" ]; then
@@ -141,6 +144,7 @@ else
       case "$pname" in
         statement_timeout) expect=$APP_STMT_MS ;;
         lock_timeout)      expect=$APP_LOCK_MS ;;
+        idle_in_transaction_session_timeout) expect=$APP_IDLE_MS ;;
         *) continue ;;
       esac
       if [ "$pval" -eq 0 ]; then
