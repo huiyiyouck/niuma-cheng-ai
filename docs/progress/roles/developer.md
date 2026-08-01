@@ -1,5 +1,23 @@
 # Developer 角色日志
 
+## 2026-08-01 — CN-009 受影响角色确认（Developer）
+
+- 本次角色：Developer
+- 动作：Change Note 确认（变更 1 直接进实现范围，开工前须落地）
+- 涉及文档：`docs/progress/iterations/v0.2-cn-009.md`（填本角色确认意见）；核对设计 §4.6 写回 SQL、§2.3 `WriteBackPayload`、`src/agent_hub/schemas.py:57`
+- 结论：**已确认，四条变更全部同意**；附一条必须补的实现落点 + 一处章节号订正。
+  1. **必须两处都加，缺一即静默失效（本 CN 未写，是我补的）**：设计 §4.6 写回是 `INSERT ... ON CONFLICT (raw_item_id) DO UPDATE SET ...`，而 C-3 定案是 **ai UPDATE 占位行**——占位行由 xiaobao 在 L0 通过时创建，故**「冲突并走 DO UPDATE 分支」是常态而非例外**。若只把 `needs_context` 加进 INSERT 列清单、漏了 `DO UPDATE SET`，该列会**永远保持 NULL 且不报错**——与本 CN 要修的「列存在但信号永远缺失」**完全同型**，成因只是从「没写列」换成「没写 SET」。实现两处一起加，自测断言须覆盖「占位行已存在」这条路径（只测 INSERT 分支会漏）。
+  2. **章节号订正**：本 CN 正文与 Architect 行均写「设计 §3.4 写回映射」，但 **§3.4 是 claim SQL**；实际落点是 **§2.3 `WriteBackPayload`** + **§4.6 写回 SQL 两处**。
+  3. **类型与权限核实无问题**：`L1Output.needs_context` 为 `bool = False`（`schemas.py:57`），不会为 None，直接映射 boolean 列；`processed_news` 是**表级** SELECT/INSERT/UPDATE，新列自动覆盖，「无 GRANT 动作」正确。
+  4. **变更 4 补一条自测排期约束**：并发 claim 与事务回滚（测试 6/7/22/23）**可全程 `ROLLBACK` 不消耗队列**（C-6 实证已验证该做法），而**端到端冒烟（测试 20）必然消耗**。自测计划把两类分开，**优先保留至少 1 条 `domain_tags` 非空条目给端到端**——否则「有值」路径（同时进 prompt 与 `kb-search` 查询条件）会直到生产才首次执行。
+  5. **列迁移不阻塞开工**：对方 `ALTER TABLE ADD COLUMN` 未落地，但单测/黄金样本走 fixture 与 mock、不碰真实库；仅真实库测试（7/20/22/23）需列到位。按「有列」实现并推进单测，冒烟前由 DevOps 实查一次即可，不必互等。
+  6. **变更 2/3 无实现动作**：`score_total` 差异性质变为「有方案的临时状态」，联调判读须知照旧；`language` 我方本就写「固定 `'zh'`」。
+- 关联迭代：v0.2
+- 关联 Change Note：CN-009（本条）
+- 遗留问题/风险：① 若实现时漏了 `DO UPDATE SET` 子句，会重演本 CN 要修的静默缺失（已写入确认意见与自测断言要求）② `domain_tags` 非空条目稀缺（实查为准），自测消耗需用 ROLLBACK 保护 ③ 对方列迁移须在联调冒烟前落地，归 DevOps 前置核对
+- 下一步入口：CN-009 待 Architect / DevOps 确认 → Architect 按订正后的落点（§2.3 + §4.6）补设计 → 实现阶段开工（§6.1 步 0 先录黄金样本）
+- 收尾状态：已收尾
+
 ## 2026-07-30 — 一次性确认 CN-003 / CN-004 / CN-007 / CN-008（Developer）
 
 - 本次角色：Developer
