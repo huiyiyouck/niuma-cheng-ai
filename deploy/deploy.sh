@@ -100,6 +100,63 @@ else
   echo "  ✓ 应用层与 ASGI 层一致（${GRACE_SEC_EXPECT}s）；**托管层待装 unit 后由本脚本校验**"
 fi
 
+echo "==== [4.6/6] DB 角色默认超时校验 ===="
+# CN-008 变更 3 允许用 ALTER ROLE 给 ai_worker 设语句级超时作兜底（防应用某条
+# 路径忘了 SET），但约束「取值须与应用层一致或更宽松」——角色默认值会被连接后的
+# _configure 覆盖，所以它约束不了应用；反过来若角色默认【更严】，在 _configure
+# 执行前的那几条语句上会先生效，造成只在建连瞬间出现、极难归因的偶发失败。
+#
+# 该约束原本没有任何强制点（DevOps 确认 CN-008 时提的中②），与设计 §698 的
+# 三层时限同构：应用侧读不到数据库侧的角色默认值，强制点只能在部署层。
+# 2026-08-01 已按 REQ-003 方案甲写入 statement_timeout=4s / lock_timeout=3s /
+# idle_in_transaction_session_timeout=60s（跨项目约定，ai 侧执行、xiaobao 核对）。
+DB_HOST=$(grep -E '^AI_DB_HOST=' "$RUN/.env" | cut -d= -f2- || true)
+DB_PORT=$(grep -E '^AI_DB_PORT=' "$RUN/.env" | cut -d= -f2- || true)
+DB_NAME=$(grep -E '^AI_DB_NAME=' "$RUN/.env" | cut -d= -f2- || true)
+DB_USER=$(grep -E '^AI_DB_USER=' "$RUN/.env" | cut -d= -f2- || true)
+# 应用层取值：v0.2 实现前 .env 尚无这两项，退回 CN-008 定的默认值
+APP_STMT_MS=$(grep -E '^AI_DB_STATEMENT_TIMEOUT_MS=' "$RUN/.env" | cut -d= -f2- || true)
+APP_LOCK_MS=$(grep -E '^AI_DB_LOCK_TIMEOUT_MS=' "$RUN/.env" | cut -d= -f2- || true)
+APP_STMT_MS=${APP_STMT_MS:-4000}
+APP_LOCK_MS=${APP_LOCK_MS:-3000}
+
+if ! command -v psql >/dev/null 2>&1; then
+  echo "  ⚠ 未装 psql，跳过——角色默认值无人校验"
+elif [ -z "$DB_HOST" ]; then
+  echo "  ⚠ .env 未配 AI_DB_HOST，跳过（DB 模式尚未启用）"
+else
+  # 裸连接：psql 不执行 _configure，故此处读到的正是角色默认值。
+  # pg_settings.setting 对这两项以 ms 为单位返回整数，省掉 '4s'/'4000ms' 的单位解析。
+  DB_PASS=$(grep -E '^AI_DB_PASSWORD=' "$RUN/.env" | cut -d= -f2- || true)
+  ROLE_VALS=$(PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "${DB_PORT:-5432}" \
+      -U "$DB_USER" -d "$DB_NAME" -tAq \
+      -c "SELECT name||' '||setting FROM pg_settings WHERE name IN ('statement_timeout','lock_timeout') ORDER BY name;" \
+      2>/dev/null || true)
+  unset DB_PASS
+  if [ -z "$ROLE_VALS" ]; then
+    echo "  ⚠ 连不上数据库，跳过本项（不阻塞部署——本项校验的是兜底配置，不是服务可用性）"
+  else
+    while read -r pname pval; do
+      [ -n "$pname" ] || continue
+      case "$pname" in
+        statement_timeout) expect=$APP_STMT_MS ;;
+        lock_timeout)      expect=$APP_LOCK_MS ;;
+        *) continue ;;
+      esac
+      if [ "$pval" -eq 0 ]; then
+        echo "  ⚠ $pname 角色默认未设（=0，无限制）——应用层 SET 仍生效，但少了忘配时的兜底"
+      elif [ "$pval" -lt "$expect" ]; then
+        echo "!! $pname 的角色默认值 ${pval}ms 严于应用层 ${expect}ms" >&2
+        echo "   该值在连接后 _configure 执行前先生效，会造成只在建连瞬间出现的偶发失败，且极难归因" >&2
+        echo "   修复: ALTER ROLE $DB_USER SET $pname = '${expect}ms';" >&2
+        exit 1
+      else
+        echo "  ✓ $pname: 角色默认 ${pval}ms ≥ 应用层 ${expect}ms"
+      fi
+    done <<< "$ROLE_VALS"
+  fi
+fi
+
 echo "==== [5/6] 重启服务 ===="
 systemctl daemon-reload
 # RUN_MODE 由 unit 决定（见 unit 内 Environment=RUN_MODE），此处按启用状态重启
