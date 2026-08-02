@@ -326,13 +326,13 @@ def _build_kb_query(inp: L1Input) -> str:
     return query.strip()[:_KB_QUERY_MAX_LEN]
 
 
-def llm_process_node(state: L1State) -> dict:
+async def llm_process_node(state: L1State) -> dict:
     """调用注入的 LLM client。失败时记录 recoverable=False 错误、不抛异常。"""
     client: AIClient = state["client"]
     inp = state["inp"]
     messages = build_news_l1_messages(inp, state["context_items"])
     try:
-        result = client.complete_json(messages, timeout_ms=inp.options.timeout_ms)
+        result = await client.complete_json(messages, timeout_ms=inp.options.timeout_ms)
     except Exception as exc:  # noqa: BLE001 — 全 provider 失败统一降级为完全失败
         err = StepError(
             step="llm_process",

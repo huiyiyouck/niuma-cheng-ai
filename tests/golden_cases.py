@@ -83,7 +83,7 @@ class GoldenClient:
     def __init__(self, provider_name: str = "primary"):
         self._provider_name = provider_name
 
-    def complete_json(self, messages: list[dict], timeout_ms: int) -> LLMResult:
+    async def complete_json(self, messages: list[dict], timeout_ms: int) -> LLMResult:
         return LLMResult(
             provider_name=self._provider_name,
             parsed=dict(GOLDEN_PARSED),
@@ -154,12 +154,12 @@ def _providers() -> list[ProviderConfig]:
     ]
 
 
-def _fenced_caller(provider, messages, timeout_ms) -> str:
+async def _fenced_caller(provider, messages, timeout_ms) -> str:
     """样本 ③：返回 markdown fence 包裹的 JSON，走 `llm/json.py` 的 _repair 分支。"""
     return "```json\n" + GOLDEN_RAW_JSON + "\n```"
 
 
-def _timeout_then_ok_caller(provider, messages, timeout_ms) -> str:
+async def _timeout_then_ok_caller(provider, messages, timeout_ms) -> str:
     """样本 ④：primary 超时 → fallback 到 backup 成功。
 
     改造后此处的超时若变成 `asyncio.TimeoutError` 而未被认作 timeout kind，

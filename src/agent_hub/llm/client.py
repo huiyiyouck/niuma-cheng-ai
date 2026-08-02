@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import os
 import time
@@ -32,7 +33,7 @@ class LLMResult:
 
 
 class AIClient(Protocol):
-    def complete_json(self, messages: list[dict], timeout_ms: int) -> LLMResult: ...
+    async def complete_json(self, messages: list[dict], timeout_ms: int) -> LLMResult: ...
 
 
 class ProviderCallError(Exception):
@@ -78,7 +79,7 @@ _KIND_TAG = {
 
 
 class UnconfiguredClient:
-    def complete_json(self, messages: list[dict], timeout_ms: int) -> LLMResult:
+    async def complete_json(self, messages: list[dict], timeout_ms: int) -> LLMResult:
         raise ProvidersNotConfiguredError("no LLM provider configured")
 
 
@@ -95,7 +96,7 @@ class ChainedAIClient:
         self._call = caller or _http_call_provider
         self._budget_ms = budget_ms
 
-    def complete_json(self, messages: list[dict], timeout_ms: int) -> LLMResult:
+    async def complete_json(self, messages: list[dict], timeout_ms: int) -> LLMResult:
         budget = timeout_ms if self._budget_ms is None else min(self._budget_ms, timeout_ms)
         start = time.monotonic()
         errors: list[tuple[str, str]] = []
@@ -107,13 +108,13 @@ class ChainedAIClient:
                 errors.append((provider.name, "budget_exhausted"))
                 break
             call_timeout = min(provider.timeout_ms or remaining, remaining)
-            result = self._attempt_provider(provider, messages, call_timeout, errors)
+            result = await self._attempt_provider(provider, messages, call_timeout, errors)
             if result is not None:
                 return result
 
         raise AllProvidersFailedError(errors)
 
-    def _attempt_provider(
+    async def _attempt_provider(
         self,
         provider: ProviderConfig,
         messages: list[dict],
@@ -125,7 +126,7 @@ class ChainedAIClient:
         # 至多 2 次：原始调用 + provider quirk 参数调整后重试
         for attempt in range(2):
             try:
-                raw = self._call(active, messages, timeout_ms)
+                raw = await self._call(active, messages, timeout_ms)
             except ProviderQuirkError as quirk:
                 if attempt == 0:
                     active = _disable_quirk(active, quirk.param)
@@ -162,7 +163,7 @@ def _disable_quirk(provider: ProviderConfig, param: str) -> ProviderConfig:
     return provider
 
 
-def _http_call_provider(provider: ProviderConfig, messages: list[dict], timeout_ms: int) -> str:
+async def _http_call_provider(provider: ProviderConfig, messages: list[dict], timeout_ms: int) -> str:
     """真实 OpenAI 兼容 chat completions 调用。错误翻译为 fallback 异常。"""
     api_key = os.getenv(provider.api_key_env, "")
     payload: dict = {"model": provider.model, "messages": messages}
@@ -173,13 +174,17 @@ def _http_call_provider(provider: ProviderConfig, messages: list[dict], timeout_
 
     url = provider.base_url.rstrip("/") + "/chat/completions"
     try:
-        resp = httpx.post(
-            url,
-            json=payload,
-            headers={"Authorization": f"Bearer {api_key}"},
-            timeout=timeout_ms / 1000,
-        )
-    except httpx.TimeoutException as exc:
+        async with httpx.AsyncClient(timeout=timeout_ms / 1000) as client:
+            resp = await client.post(
+                url,
+                json=payload,
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+    # asyncio.TimeoutError 必须与 httpx.TimeoutException 一并认作 timeout kind
+    # （设计 §6.2 样本 ④ 的实现约束）：async 下若调用被 asyncio.wait_for 之类
+    # 包裹，抛出的是前者；只认后者会让异常穿透 _attempt_provider，fallback 链
+    # 静默失效、整条变完全失败。
+    except (httpx.TimeoutException, asyncio.TimeoutError) as exc:
         raise ProviderCallError(kind="timeout") from exc
     except httpx.HTTPError as exc:
         raise ProviderCallError(kind="timeout", message="network error") from exc

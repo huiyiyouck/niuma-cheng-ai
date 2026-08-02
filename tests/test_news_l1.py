@@ -49,7 +49,7 @@ class FakeClient:
         self._exc = exc
         self._provider = provider
 
-    def complete_json(self, messages, timeout_ms):
+    async def complete_json(self, messages, timeout_ms):
         if self._exc is not None:
             raise self._exc
         return LLMResult(provider_name=self._provider, parsed=self._parsed, raw="{}")
