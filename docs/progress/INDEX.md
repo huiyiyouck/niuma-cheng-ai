@@ -109,6 +109,7 @@
 
 | 优先级 | 待办 | 归属角色 | 来源 | 状态 |
 |--------|------|----------|------|------|
+| P1 | **是否为「LLM 未给 scores」补 `degraded:scores_missing` 标记** —— 实测该情形产出「结构完整但全 0、reason 全空」，与 `needs_context` 的 `false` 双来源同形状（默认值与有效值混在同一取值、且落在错误一侧）。xiaobao 补算 tick 的「结构残缺则跳过」判据抓不到它，会把该条当有效 0 分加权、排到最后。已在 coordination 给出当下可用的判别手段（判 `reason` 非空而非 `score`），故**不阻塞联调**；但数据层直接可判优于靠推断。属范围决策，若定为要加须先出 Change Note | PM / Architect | Developer 2026-08-02 联调回帖实测 | 待判断 |
 | P1 | REQ-001 真实 L1 处理（stub→真实）已转入 v0.1 标准迭代，由迭代记录跟踪 | PM | xiaobao 提报 REQ-001 / Owner 立项 | ✅ 已完成（v0.1 已关闭，2026-07-04） |
 | P1 | REQ-002 数据架构调研：读 Horizon/aggregator、答 4 岔路口、出数据架构方案 | Architect | Owner 指派 REQ-002 / 2026-06-29 ai PM 承接 | 已完成（2026-06-29，见 ad-hoc spike） |
 | P1 | 承接 coordination REQ-003（数据库边界异步解耦）：已于 2026-07-25 承接并转入 v0.2 标准迭代，由迭代记录跟踪 | PM | xiaobao PM 提报 REQ-003（2026-07-05 初版 / 07-12 R2）/ Owner 2026-07-25 拍板 v0.2 重排 | 进行中（PRD R4 已定稿，进设计阶段；C-11~C-13 + Q-1 待 xiaobao 回应，均不阻塞） |
