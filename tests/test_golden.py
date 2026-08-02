@@ -25,7 +25,7 @@ GOLDEN_DIR = Path(__file__).parent / "golden"
 RECORD = os.getenv("GOLDEN_RECORD") == "1"
 
 
-def _snapshot(name: str) -> dict:
+async def _snapshot(name: str) -> dict:
     """跑一类用例并归一化为可比对的快照。
 
     记录的是 `TaskRunResult` 的全部可观测字段，而不只是 `L1Output`——
@@ -34,7 +34,7 @@ def _snapshot(name: str) -> dict:
     `run_id` 不入快照（每次不同，且不属被测行为）。
     """
     inp, client, tools = CASES[name]()
-    result = run_task("news-l1", f"golden_{name}", inp, client=client, tools=tools)
+    result = await run_task("news-l1", f"golden_{name}", inp, client=client, tools=tools)
     return {
         "output": result.output.model_dump(mode="json") if result.output else None,
         "tool_summary": result.tool_summary.model_dump(mode="json"),
@@ -45,9 +45,9 @@ def _snapshot(name: str) -> dict:
 
 
 @pytest.mark.parametrize("name", sorted(CASES))
-def test_golden(name: str):
+async def test_golden(name: str):
     path = GOLDEN_DIR / f"{name}.json"
-    actual = _snapshot(name)
+    actual = await _snapshot(name)
 
     if RECORD:
         GOLDEN_DIR.mkdir(parents=True, exist_ok=True)

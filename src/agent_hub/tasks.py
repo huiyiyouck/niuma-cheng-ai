@@ -52,7 +52,7 @@ def get_task(task_type: str) -> TaskSpec:
         raise UnknownTaskError(task_type) from exc
 
 
-def run_task(
+async def run_task(
     task_type: str,
     run_id: str,
     inp: BaseModel,
@@ -61,7 +61,7 @@ def run_task(
 ) -> TaskRunResult:
     spec = get_task(task_type)
     state = spec.init_state(run_id, inp, client, tools or DefaultNewsTools())
-    final = spec.graph.invoke(state)
+    final = await spec.graph.ainvoke(state)
     output = final.get("output")
     return TaskRunResult(
         output=output,

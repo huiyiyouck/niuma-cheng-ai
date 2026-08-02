@@ -187,10 +187,10 @@ def test_processing_tags_carry_real_engine():
 
 
 # --- run_task 直连（不经 HTTP）：dispatch 正确 ---
-def test_run_task_dispatch_succeeded():
+async def test_run_task_dispatch_succeeded():
     from agent_hub.schemas import L1Input
 
-    result = run_task(
+    result = await run_task(
         "news-l1",
         "run_test",
         L1Input(**_payload()),
