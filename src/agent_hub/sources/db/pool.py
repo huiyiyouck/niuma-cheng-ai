@@ -40,10 +40,17 @@ async def _configure(conn, s: WorkerSettings) -> None:
 
     三层超时逐层收紧（lock < statement < tx），便于在日志中区分「等锁」
     「查询慢」「事务超时」——三者的处置方向完全不同。
+
+    **必须 commit**：psycopg3 的池化连接默认 `autocommit=False`，`SET` 会隐式
+    开启事务；configure 返回时连接若停留在 `INTRANS`，`psycopg_pool` 会判定
+    「connection left in status INTRANS by configure function」并**丢弃该连接**，
+    池永远初始化不完（表现为 `PoolTimeout`，与配置项本身无关，极难归因）。
+    该失效只在真实 PG 上出现，mock 与静态检查都发现不了。
     """
     await conn.execute(f"SET statement_timeout = {s.statement_timeout_ms}")
     await conn.execute(f"SET lock_timeout = {s.lock_timeout_ms}")
     await conn.execute("SET default_transaction_isolation = 'read committed'")
+    await conn.commit()
 
 
 async def assert_read_committed(pool: AsyncConnectionPool) -> None:
