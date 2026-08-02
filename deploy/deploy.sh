@@ -36,6 +36,12 @@ git log --oneline -1
 echo "==== [2/6] 自测闸门 ===="
 # xiaobao 的 deploy.sh 没有这道闸。ai 必须有：async 改造期（O-8，本迭代最大
 # 技术风险）任何一次回归都可能悄悄改变处理行为，不能带着红灯上线。
+#
+# 闸门跑在【构建源】venv 上，而 [4/6] 装的是【运行目录】venv——两者是不同的
+# 环境。构建源 venv 若不同步依赖，任何新增依赖都会让这道闸在 ImportError 上
+# 失败，而失败原因与被检查的代码无关（2026-08-02 实现 R1 新增 psycopg 时实际
+# 暴露：两个 venv 均无该包，下次部署必然在此中止）。故先同步再跑。
+"$SRC/.venv/bin/pip" install --quiet -r "$SRC/requirements.txt"
 PYTHONPATH="$SRC/src" "$SRC/.venv/bin/pytest" -q
 
 echo "==== [3/6] 分发到运行目录 ($RUN) ===="
