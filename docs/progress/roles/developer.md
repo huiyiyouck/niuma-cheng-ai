@@ -1,5 +1,25 @@
 # Developer 角色日志
 
+## 2026-08-02 — v0.2 实现 R1 交付 + 真实环境验证 + 跨项目回帖
+
+- 本次角色：Developer（实现 + 自测 + 联调证据更新）
+- 动作：按设计 §6.1 步 0~5 完成实现；服务器真实 PG + 真实 LLM 验证；回帖 coordination
+- 涉及文档：`v0.2-test-report.md`（新建）、`v0.2.md` 实现门禁、coordination `communications/REQ-003`（联调证据，Developer 手册授权范围）
+- base_commit `a9eb235` → head_commit `9e46ea8`（16 个提交）
+- 结论：**实现完成，三层验证全通过**；但据实不声称联调验收通过。
+  1. **单元 141 项**：async 改造四步每步跑黄金样本比对，零行为漂移。步 2 断言失败 7 项中 5 项是 fake 未随协议改 async——改完 fake 后**快照一字未动即全绿**，回归判据确实独立于测试代码的改写（我 R3 提黄金样本时要解的正是这个循环论证）。
+  2. **真实 PG 集成 10 项**：独立测试库（`pg_dump` 复制 schema + 列级 GRANT 逐条复刻），未消耗对方样本。
+  3. **真实 LLM 端到端**：62~70s 闭环，四维评分带 reason、五类标签齐全、`score_total` 保持 NULL。
+- **对设计的三处偏离**（均记于 commit 与自测报告）：① 步骤顺序——设计步 1 的判据「黄金样本通过」在只改工具层时不可能达成（同步节点无法 await），实测 `ainvoke` 可跑同步节点故把入口层提前；偏离顺序非分层原则 ② `ItemBudget` 放顶层而非 `worker/`——否则处理核心反向依赖拉取型控制流，违反 §1.3 ③ `extract_url` 保持同步（无 IO，按 O-8 判据）。
+- **真实环境查出三个 mock 查不出的问题**：
+  - **连接池 `INTRANS`（我方缺陷，已修）**：`configure` 中 `SET` 隐式开事务，连接归还时停在 `INTRANS` 被 `psycopg_pool` 丢弃，池永不初始化完。表现 `PoolTimeout` 与根因（少一次 `commit`）毫无关联，联调时极难归因。
+  - **部署 LLM 配置失效（归 DevOps）**：`.env` 配的 `/api/coding/v3` + `VOLC_API_KEY` 订阅已过期（400 InvalidSubscription）。**已用同步/异步两种调法二分确认结果一致**，非 async 改造引入。openclaw 的 `/api/plan/v3`（同一模型名）与 deepseek 实测均 200 可用；且原 `.env` 只有一个 provider，ADR-0002 的 fallback 链从未真正生效，建议两个都配。
+  - **按契约猜必填列会写不进去**：`sources.display_name` / `raw_items.source_item_id` 是必填，契约只列了 ai 需读的列。
+- 关联迭代：v0.2；关联 Change Note：CN-003~CN-009（全部已确认）
+- 遗留问题/风险：① **对方真实数据端到端未跑**（会消耗其样本，已在 coordination 请对方约时机）② 部署 `.env` 的 LLM 配置待 DevOps 更新，否则联调必失败 ③ 三层停机时限的托管层取值归 DevOps ④ 服务器上留有 worktree `/root/Project/ai-itest`、测试库 `ai_l1_itest`、`itest_seeder` 角色，供 Review 与 R2 复跑
+- 下一步入口：实现 R1 Review（Review 方待 PM 指定）；对方 Developer 复核写回字段 + 约端到端时机；DevOps 更新 LLM 配置
+- 收尾状态：已收尾
+
 ## 2026-08-01 — CN-009 受影响角色确认（Developer）
 
 - 本次角色：Developer
