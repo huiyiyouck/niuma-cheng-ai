@@ -8,18 +8,28 @@ import time
 import uuid
 
 from fastapi import Depends, FastAPI
+from fastapi.responses import JSONResponse
 
+from agent_hub.config import load_and_validate_worker_settings
+from agent_hub.health import build_health
 from agent_hub.llm.client import AIClient, get_ai_client
 from agent_hub.schemas import L1Input, RunResponse, ToolSummary
 from agent_hub.tasks import run_task
 from agent_hub.tools.base import NewsTools, get_news_tools
 
-app = FastAPI(title="niuma-cheng-ai", version="0.1.0")
+app = FastAPI(title="niuma-cheng-ai", version="0.2.0")
+
+# 进程级模式开关（AC-1.4）。HTTP 模式下不建连接池、不起 worker，
+# `worker_state` 为 null，端点行为与 v0.1 等价（AC-1.1）。
+app.state.settings = load_and_validate_worker_settings()
+app.state.worker = None
 
 
 @app.get("/health")
-def health() -> dict:
-    return {"status": "ok", "service": "niuma-cheng-ai"}
+def health() -> JSONResponse:
+    """三重探活（AC-9.3）。不做任何 IO——它是 async 彻底性的运行时闸门。"""
+    body, code = build_health(app.state.settings, app.state.worker)
+    return JSONResponse(content=body, status_code=code)
 
 
 @app.post("/v1/runs/news-l1", response_model=RunResponse)
