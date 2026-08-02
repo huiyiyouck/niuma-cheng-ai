@@ -42,7 +42,12 @@ echo "==== [2/6] 自测闸门 ===="
 # 失败，而失败原因与被检查的代码无关（2026-08-02 实现 R1 新增 psycopg 时实际
 # 暴露：两个 venv 均无该包，下次部署必然在此中止）。故先同步再跑。
 "$SRC/.venv/bin/pip" install --quiet -r "$SRC/requirements.txt"
-PYTHONPATH="$SRC/src" "$SRC/.venv/bin/pytest" -q
+# 用 `python -m pytest` 而非 `bin/pytest`：前者会把 cwd（此处即 $SRC）注入
+# sys.path，后者不会。实现 R1 起有 5 个测试文件跨模块 `from tests.xxx import`，
+# 而 tests/ 不是包（无 __init__.py），用 bin/pytest 会全部 collection error。
+# 更要紧的理由：开发者本地就是以 `python -m pytest` 验的——闸门必须用同一种
+# 方式跑，否则闸门验的东西和开发者验的东西不是一回事。
+PYTHONPATH="$SRC/src" "$SRC/.venv/bin/python" -m pytest -q
 
 echo "==== [3/6] 分发到运行目录 ($RUN) ===="
 mkdir -p "$RUN"
