@@ -112,13 +112,13 @@ class GoldenTools:
             items=[ToolResultItem(content=f"{source} 证据片段。", title=f"{source} 标题", url=url)],
         )
 
-    def read_url(self, url: str, timeout_ms: int) -> ToolResult:
+    async def read_url(self, url: str, timeout_ms: int) -> ToolResult:
         return self._result("link", "https://example.com/origin")
 
-    def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult:
+    async def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult:
         return self._result("web", "https://example.com/web-1")
 
-    def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult:
+    async def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult:
         return self._result("kb", "https://example.com/kb-1")
 
 
@@ -131,13 +131,13 @@ class SilentTools:
     def extract_url(self, raw_content: dict) -> str | None:
         return None
 
-    def read_url(self, url: str, timeout_ms: int) -> ToolResult:
+    async def read_url(self, url: str, timeout_ms: int) -> ToolResult:
         raise AssertionError("SilentTools.read_url 不应被调用")
 
-    def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult:
+    async def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult:
         raise AssertionError("SilentTools.search_web 不应被调用")
 
-    def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult:
+    async def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult:
         raise AssertionError("SilentTools.search_kb 不应被调用")
 
 

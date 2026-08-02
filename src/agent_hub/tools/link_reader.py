@@ -27,7 +27,7 @@ def extract_url(raw_content: dict) -> str | None:
     return None
 
 
-def read_url(url: str, timeout_ms: int):
+async def read_url(url: str, timeout_ms: int):
     from agent_hub.tools.base import ToolResult, ToolResultItem
 
     if not url.startswith(("http://", "https://")):
@@ -35,7 +35,8 @@ def read_url(url: str, timeout_ms: int):
 
     timeout = min(timeout_ms, _FETCH_TIMEOUT_MS) / 1000
     try:
-        resp = httpx.get(url, timeout=timeout, follow_redirects=True)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            resp = await client.get(url)
     except httpx.HTTPError:
         return ToolResult(ok=False, error="fetch_failed")
 

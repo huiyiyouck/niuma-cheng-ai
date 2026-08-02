@@ -13,7 +13,7 @@ import httpx
 _TAVILY_URL = "https://api.tavily.com/search"
 
 
-def search_web(query: str, max_results: int, timeout_ms: int):
+async def search_web(query: str, max_results: int, timeout_ms: int):
     from agent_hub.tools.base import ToolResult, ToolResultItem
 
     api_key = os.getenv("TAVILY_API_KEY", "")
@@ -21,16 +21,16 @@ def search_web(query: str, max_results: int, timeout_ms: int):
         return ToolResult(ok=False, error="not_configured")
 
     try:
-        resp = httpx.post(
-            _TAVILY_URL,
-            json={
-                "api_key": api_key,
-                "query": query,
-                "max_results": max_results,
-                "search_depth": "basic",
-            },
-            timeout=timeout_ms / 1000,
-        )
+        async with httpx.AsyncClient(timeout=timeout_ms / 1000) as client:
+            resp = await client.post(
+                _TAVILY_URL,
+                json={
+                    "api_key": api_key,
+                    "query": query,
+                    "max_results": max_results,
+                    "search_depth": "basic",
+                },
+            )
     except httpx.HTTPError:
         return ToolResult(ok=False, error="search_failed")
 

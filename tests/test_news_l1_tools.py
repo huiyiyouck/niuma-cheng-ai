@@ -30,15 +30,15 @@ class FakeTools:
     def extract_url(self, raw_content):
         return self._url or raw_content.get("url") or raw_content.get("canonical_url")
 
-    def read_url(self, url, timeout_ms):
+    async def read_url(self, url, timeout_ms):
         self.link_calls += 1
         return self._link or ToolResult(ok=False, error="failed")
 
-    def search_web(self, query, max_results, timeout_ms):
+    async def search_web(self, query, max_results, timeout_ms):
         self.web_calls += 1
         return self._web or ToolResult(ok=False, error="failed")
 
-    def search_kb(self, query, top_n, timeout_ms, **kw):
+    async def search_kb(self, query, top_n, timeout_ms, **kw):
         self.kb_calls += 1
         return self._kb or ToolResult(ok=False, error="failed")
 

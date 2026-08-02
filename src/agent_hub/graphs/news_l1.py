@@ -135,13 +135,13 @@ def ingest_context_node(state: L1State) -> dict:
     return {"context_items": items}
 
 
-def link_read_node(state: L1State) -> dict:
+async def link_read_node(state: L1State) -> dict:
     """从 raw_content 约定 key 抓取链接正文。发起即计数，失败可降级继续。"""
     inp = state["inp"]
     tools = state["tools"]
     url = tools.extract_url(inp.raw_content)
     timeout = min(inp.options.timeout_ms, _LINK_TIMEOUT_MS)
-    result = tools.read_url(url, timeout)
+    result = await tools.read_url(url, timeout)
 
     updates: dict = {
         "tool_summary": _bump_tool(state["tool_summary"], "link_read"),
@@ -166,11 +166,13 @@ def link_read_node(state: L1State) -> dict:
     return updates
 
 
-def web_search_node(state: L1State) -> dict:
+async def web_search_node(state: L1State) -> dict:
     """Tavily 搜索补充上下文。发起即计数，失败可降级继续。"""
     inp = state["inp"]
     tools = state["tools"]
-    result = tools.search_web(_build_query(inp), inp.options.max_tool_calls, inp.options.timeout_ms)
+    result = await tools.search_web(
+        _build_query(inp), inp.options.max_tool_calls, inp.options.timeout_ms
+    )
 
     updates: dict = {
         "tool_summary": _bump_tool(state["tool_summary"], "web_search"),
@@ -195,11 +197,11 @@ def web_search_node(state: L1State) -> dict:
     return updates
 
 
-def kb_search_node(state: L1State) -> dict:
+async def kb_search_node(state: L1State) -> dict:
     """主动库内检索：回调 xiaobao /v1/kb-search（CN-002）。发起即计数，失败可降级。"""
     inp = state["inp"]
     tools = state["tools"]
-    result = tools.search_kb(
+    result = await tools.search_kb(
         _build_kb_query(inp),
         _KB_TOP_N,
         inp.options.timeout_ms,

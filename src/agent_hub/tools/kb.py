@@ -18,7 +18,7 @@ def kb_configured() -> bool:
     return bool(os.getenv("KB_SEARCH_URL", "").strip())
 
 
-def search_kb(
+async def search_kb(
     query: str,
     top_n: int,
     timeout_ms: int,
@@ -47,7 +47,8 @@ def search_kb(
         body["domain_tags"] = domain_tags
 
     try:
-        resp = httpx.post(url, json=body, headers=headers, timeout=timeout_ms / 1000)
+        async with httpx.AsyncClient(timeout=timeout_ms / 1000) as client:
+            resp = await client.post(url, json=body, headers=headers)
     except httpx.HTTPError:
         return ToolResult(ok=False, error="kb_search_failed")
 

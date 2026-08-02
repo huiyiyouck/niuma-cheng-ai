@@ -31,13 +31,21 @@ class ToolResult:
 
 
 class NewsTools(Protocol):
+    """工具协议。
+
+    三个做出网调用的方法为 async；`extract_url` **保持同步**——它是纯字典取值
+    与前缀判定、无 IO 且耗时为微秒级，按 O-8 的划线判据（「无 IO 且耗时毫秒级
+    保持同步」）不应改为协程。设计 §6.1 步 1 写「4 方法改 async」不够精确，
+    照字面改会给一个纯计算函数套上协程调度开销。
+    """
+
     tavily_configured: bool
     kb_configured: bool
 
     def extract_url(self, raw_content: dict) -> str | None: ...
-    def read_url(self, url: str, timeout_ms: int) -> ToolResult: ...
-    def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult: ...
-    def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult: ...
+    async def read_url(self, url: str, timeout_ms: int) -> ToolResult: ...
+    async def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult: ...
+    async def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult: ...
 
 
 class DefaultNewsTools:
@@ -50,14 +58,14 @@ class DefaultNewsTools:
     def extract_url(self, raw_content: dict) -> str | None:
         return extract_url(raw_content)
 
-    def read_url(self, url: str, timeout_ms: int) -> ToolResult:
-        return read_url(url, timeout_ms)
+    async def read_url(self, url: str, timeout_ms: int) -> ToolResult:
+        return await read_url(url, timeout_ms)
 
-    def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult:
-        return search_web(query, max_results, timeout_ms)
+    async def search_web(self, query: str, max_results: int, timeout_ms: int) -> ToolResult:
+        return await search_web(query, max_results, timeout_ms)
 
-    def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult:
-        return search_kb(query, top_n, timeout_ms, **kw)
+    async def search_kb(self, query: str, top_n: int, timeout_ms: int, **kw) -> ToolResult:
+        return await search_kb(query, top_n, timeout_ms, **kw)
 
 
 def get_news_tools() -> NewsTools:

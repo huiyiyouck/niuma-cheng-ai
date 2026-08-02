@@ -64,13 +64,13 @@ class NullTools:
     def extract_url(self, raw_content):
         return None
 
-    def read_url(self, url, timeout_ms):
+    async def read_url(self, url, timeout_ms):
         return ToolResult(ok=False, error="disabled")
 
-    def search_web(self, query, max_results, timeout_ms):
+    async def search_web(self, query, max_results, timeout_ms):
         return ToolResult(ok=False, error="disabled")
 
-    def search_kb(self, query, top_n, timeout_ms, **kw):
+    async def search_kb(self, query, top_n, timeout_ms, **kw):
         return ToolResult(ok=False, error="disabled")
 
 
