@@ -1,0 +1,62 @@
+{
+  "degradations": [],
+  "error": null,
+  "needs_context": true,
+  "output": {
+    "analysis": "若能效比属实，将影响推理成本结构。",
+    "context": [
+      {
+        "note": "背景一",
+        "url": "https://example.com/kb-1"
+      }
+    ],
+    "needs_context": true,
+    "score_dimensions": {
+      "clarity": {
+        "reason": "表述明确",
+        "score": 5
+      },
+      "confidence": {
+        "reason": "官方渠道",
+        "score": 4
+      },
+      "impact": {
+        "reason": "影响特定行业",
+        "score": 3
+      },
+      "timeliness": {
+        "reason": "当日发布",
+        "score": 4
+      }
+    },
+    "summary": "某公司发布新一代推理芯片，宣称能效比上代提升两倍。",
+    "tags": {
+      "content_type": [
+        "新闻"
+      ],
+      "domain": [
+        "AI",
+        "芯片"
+      ],
+      "entity": [
+        "某公司"
+      ],
+      "event": [
+        "产品发布"
+      ],
+      "processing": [
+        "engine:agent_hub",
+        "llm:primary"
+      ]
+    },
+    "title": "示例标题：某公司发布新一代推理芯片",
+    "translation": {
+      "zh": "某公司发布新一代推理芯片。"
+    }
+  },
+  "tool_summary": {
+    "kb_search": 1,
+    "link_read": 1,
+    "web_search": 1
+  }
+}
