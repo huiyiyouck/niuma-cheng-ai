@@ -28,9 +28,11 @@ class DbL1Mapper:
         parts = get_adapter(record.source_type).build(record)
 
         raw_content: dict = {"title": parts.title, **parts.extra_raw_content}
-        # 必须回填规范化后的 URL：否则 _should_link_read 恒为 False，
-        # link_read 不报错、不降级、静默失效（AC-2.4）。
-        url = normalize_url(record.source_item_url)
+        # AC-2.4：URL 值得抓时必须回填规范化后的值，否则 _should_link_read 恒为
+        # False，link_read 不报错、不降级、静默失效。
+        # 但该 AC 隐含前提是「有 URL ⇒ 那是待补充的外部材料」——对 x_twitter 不
+        # 成立（其 URL 指向内容自身）。故是否回填由适配层声明，见 url_adds_content。
+        url = normalize_url(record.source_item_url) if parts.url_adds_content else None
         if url:
             raw_content["url"] = url
 

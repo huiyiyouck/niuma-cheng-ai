@@ -9,6 +9,10 @@
 
 C-13 已确认 `rss` / `jin10_flash` 的 `source_item_url` **不保证带协议前缀**，
 故本模块的补前缀分支是必需的，不是防御性冗余。
+
+**适用范围**：以上只对「URL 指向外部补充材料」的源成立。`x_twitter` 的
+`source_item_url` 指向推文自身、正文已在 `content.text` 里，其映射不回填
+URL（见 `L1InputParts.url_adds_content`）——那不是静默失效，是有意不抓。
 """
 from __future__ import annotations
 

@@ -1,5 +1,20 @@
 # Developer 角色日志
 
+## 2026-08-02 — 消除 x_twitter 重复抓取（Owner 拍板）+ LLM 配置待办登记 DevOps
+
+- 本次角色：Developer（实现 + 真实验证 + 待办登记）
+- 动作：Owner 纠正我对 `link_read_failed` 的归因 → 实机核证 → 4 处最小改动 → 真实条目验证 → INDEX 登记两条待办
+- 结论：**改动已落地并在真实数据上验证**，`degraded:link_read_failed` 由 8/8 降为 **0/2**，结果质量无退化。
+  1. **我把因果说反了，值得记**：我从「x.com 需认证 → 抓不到 → 所以考虑跳过」入手，给 Owner 的方案是「跳过的好处是省时间、顾虑是以后配了 token 就抓不到了」。Owner 一句话点破——**原文本来就是小报抓好放在 `content.text` 里的，ai 不必再去抓**。实机核证：`content.text` 是 303 字符的推文全文，而 `source_item_url` 指向的正是这条推文自己。**即抓的目标就是我们已持有的内容**，就算 x.com 不需认证也毫无收益。**教训：我问的是「能不能抓」，该问的是「需不需要抓」**——前者把一个逻辑冗余误诊成了环境限制，还顺带把「以后能抓了怎么办」当成了真顾虑（能抓了也一样没用）。
+  2. **改动 4 处，判定放在适配层**：`L1InputParts.url_adds_content`（默认 `True`）→ `XTwitterAdapter` 声明 `False` → `DbL1Mapper` 据此决定是否回填 `raw_content["url"]`。**只有适配层知道某个源的 `content` 是全文还是摘要**；若让处理核心按 `source_type` 特判，就把数据源概念漏进了核心（AC-2.2）。`rss` / `jin10_flash` 保持回填——其 `summary` 可能只是摘要，原文确在链接里。
+  3. **收益如实界定，只有一项**：标记恢复区分度。**耗时无变化**（改前 72~90s，改后 79.0/86.8s）——x.com 返回快速失败而非超时，我此前对 Owner 说的「每条白等几秒」不成立，已在报告中订正。真正的价值是该标记原本对该源**恒为真**等于狼来了，真出抓取故障无从分辨。
+  4. **测试里埋着一个假通过，顺手拆掉**：`test_unnormalizable_url_omits_key` 原建在 `x_twitter` 记录上，改后它会**因为另一个原因继续变绿**——测的已不是它声称的东西。故与 `test_url_backfilled_into_raw_content` 一并改用 `rss` 夹具；新增的 `test_x_twitter_url_not_backfilled` 特意用**完全可规范化**的 URL，并连着断言 `link_reader.extract_url()` 为 `None`（只断言键不存在的话，将来有人改成回填 `canonical_url` 就会假通过）。142 passed。
+  5. **LLM 配置按 Owner 指派登记给 DevOps（P0）**：此前它只散落在我的日志与报告里、**从未进过 INDEX 跨任务待办**，Owner 问起才发现——等于没有任何机制会让运维看到它。已补登记，含失效证据（CodingPlan 订阅过期、HTTP 400）、可用替代（openclaw 的 `volcengine-plan` + `deepseek`，均实测 200）与「两个都配才让 ADR-0002 的 fallback 链首次真正生效」的理由。**改部署 `.env` 越 Developer 权限，我不碰**；本次验证仍以环境变量临时覆盖跑通。
+- 关联迭代：v0.2
+- 遗留问题/风险：① **本改动使 AC-2.4 不再无条件成立**，须 PM/Architect 补 Change Note 追认适用范围——不补则文档与实现对不上，且下一个人会把它当缺陷「修回去」，已登记 INDEX ② `degraded:scores_missing` 仍待 PM/Architect 判断 ③ 部署 LLM 配置待 DevOps（已登记 P0）④ 展示层核对属呈现层验收
+- 下一步入口：实现 R1 Review（待 PM 指定 Review 方）；Owner 验收
+- 收尾状态：已收尾
+
 ## 2026-08-02 — 联调五项全部完成（失败重试 + 卡死回收实测通过）
 
 - 本次角色：Developer（联调执行 + 证据回帖）

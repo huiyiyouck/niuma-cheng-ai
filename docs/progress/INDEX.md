@@ -109,6 +109,8 @@
 
 | 优先级 | 待办 | 归属角色 | 来源 | 状态 |
 |--------|------|----------|------|------|
+| **P0** | **部署 `.env` 的 LLM 配置已失效，须更新** —— 现配 `base_url=…/api/coding/v3` + `VOLC_API_KEY`，该 CodingPlan 订阅**已过期**，实调返回 **HTTP 400**。当前不阻塞是因为 `niuma-ai-worker@test` 尚未 enable；**一旦 enable，全部条目会因 LLM 失败走满 3 次重试直接进 `final_failed`**，属部署前置。**可用替代已实测**：openclaw 的 `volcengine-plan`（`…/api/plan/v3`，模型名不变仍是 `doubao-seed-2.0-pro`）与 `deepseek` 均返回 200；凭据在服务器 `/root/.openclaw/openclaw.json`（root only，勿回显/勿入 git）。**建议两个都配**——ADR-0002 的 provider fallback 链至此才第一次真正生效（此前只配一个，链形同虚设）。本迭代联调与本次验证均以环境变量临时覆盖跑通，**未改部署配置**（越 Developer 权限） | **DevOps** | Developer 2026-08-02 真实 LLM 联调查出 / Owner 2026-08-02 指派运维落地 | **待 DevOps 执行** |
+| P1 | **补 Change Note 追认 AC-2.4 适用范围收窄** —— Owner 2026-08-02 拍板「消除重复抓取」，Developer 已实现并真实验证（见下条与自测报告）。改动使 AC-2.4「入向映射必须回填 `raw_content.url`」不再无条件成立：该 AC 隐含前提是「有 URL ⇒ 那是待补充的外部材料」，对 `x_twitter` 不成立（其 URL 指向内容自身）。**代码与测试已落地，缺的是 PRD/设计侧的留痕**——不补则文档与实现对不上，且下一个人会把它当缺陷"修回去" | PM / Architect | Owner 2026-08-02 拍板 / Developer 实现后登记 | 待补 |
 | P1 | **是否为「LLM 未给 scores」补 `degraded:scores_missing` 标记** —— 实测该情形产出「结构完整但全 0、reason 全空」，与 `needs_context` 的 `false` 双来源同形状（默认值与有效值混在同一取值、且落在错误一侧）。xiaobao 补算 tick 的「结构残缺则跳过」判据抓不到它，会把该条当有效 0 分加权、排到最后。已在 coordination 给出当下可用的判别手段（判 `reason` 非空而非 `score`），故**不阻塞联调**；但数据层直接可判优于靠推断。属范围决策，若定为要加须先出 Change Note | PM / Architect | Developer 2026-08-02 联调回帖实测 | 待判断 |
 | P1 | REQ-001 真实 L1 处理（stub→真实）已转入 v0.1 标准迭代，由迭代记录跟踪 | PM | xiaobao 提报 REQ-001 / Owner 立项 | ✅ 已完成（v0.1 已关闭，2026-07-04） |
 | P1 | REQ-002 数据架构调研：读 Horizon/aggregator、答 4 岔路口、出数据架构方案 | Architect | Owner 指派 REQ-002 / 2026-06-29 ai PM 承接 | 已完成（2026-06-29，见 ad-hoc spike） |

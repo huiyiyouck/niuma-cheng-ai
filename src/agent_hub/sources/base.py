@@ -101,6 +101,21 @@ class L1InputParts:
     title: str
     raw_text: str
     extra_raw_content: dict = field(default_factory=dict)
+    url_adds_content: bool = True
+    """抓 `source_item_url` 能否带来 `raw_text` 之外的新内容。
+
+    `x_twitter` 为 `False`——其 `source_item_url` 指向的**就是这条推文本身**，
+    正文已由 xiaobao 抓好放在 `content.text`（实测该键即 X API 的推文全文），
+    再抓一次拿到的是同一份内容；且 x.com 需认证，抓取必然失败。代价不止是白
+    耗一次工具预算：`degraded:link_read_failed` 对该源**恒为真**因而失去区分
+    度，真出抓取故障时无法分辨（联调 8/8 条全带该标记）。
+
+    `rss` / `jin10_flash` 保持 `True`：其 `content.summary` 可能只是摘要
+    （`contentSnippet || content`），原文确在链接里，抓取有实质收益。
+
+    判定放在适配层而非处理核心：**只有适配层知道某个源的 `content` 是全文还
+    是摘要**；让处理核心按 `source_type` 特判会把数据源概念漏进核心（AC-2.2）。
+    """
 
 
 class SourceTypeAdapter(Protocol):

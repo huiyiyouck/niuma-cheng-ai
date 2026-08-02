@@ -59,6 +59,9 @@ class XTwitterAdapter:
                 "author_username": content.get("author_username") or "",
                 "author_name": content.get("author_name") or "",
             },
+            # 该源的 source_item_url 指向推文自身，正文已在上面的 text 里；
+            # 抓它是重复劳动且必然失败（x.com 需认证）。理由详见 L1InputParts。
+            url_adds_content=False,
         )
 
 

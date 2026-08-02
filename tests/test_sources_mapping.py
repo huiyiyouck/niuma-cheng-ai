@@ -20,6 +20,7 @@ from agent_hub.sources.base import ClaimedItem, MappingError, SourceRecord
 from agent_hub.sources.db.adapters import map_domain_tags
 from agent_hub.sources.db.mapper import DbL1Mapper
 from agent_hub.sources.url import normalize_url
+from agent_hub.tools.link_reader import extract_url
 
 _MAPPER = DbL1Mapper()
 
@@ -87,15 +88,32 @@ def test_normalize_url(raw, expected):
     assert normalize_url(raw) == expected
 
 
+def _rss(**over) -> SourceRecord:
+    """URL 指向外部材料的源——url 回填相关断言须用它，不能用 x_twitter。"""
+    return _record(source_type="rss", content={"title": "标题", "summary": "摘要"}, **over)
+
+
 def test_url_backfilled_into_raw_content():
-    """入向映射必须回填 `raw_content["url"]`，否则 link_read 静默失效。"""
-    inp = _MAPPER.to_l1_input(_record(source_item_url="x.com/u1/status/1"))
-    assert inp.raw_content["url"] == "https://x.com/u1/status/1"
+    """URL 指外部材料时必须回填 `raw_content["url"]`，否则 link_read 静默失效。"""
+    inp = _MAPPER.to_l1_input(_rss(source_item_url="example.com/a"))
+    assert inp.raw_content["url"] == "https://example.com/a"
 
 
 def test_unnormalizable_url_omits_key():
-    inp = _MAPPER.to_l1_input(_record(source_item_url="/relative"))
+    inp = _MAPPER.to_l1_input(_rss(source_item_url="/relative"))
     assert "url" not in inp.raw_content
+
+
+def test_x_twitter_url_not_backfilled():
+    """x_twitter 有意不回填：URL 指向推文自身，正文已在 `content.text`。
+
+    与上一条的区别是**这里的 URL 完全可规范化**，仍不回填。断言必须连着验
+    `_should_link_read` 实际用的判据（`link_reader.extract_url`）——只断言键
+    不存在的话，将来若有人改成回填到 `canonical_url` 就会假通过。
+    """
+    inp = _MAPPER.to_l1_input(_record(source_item_url="https://x.com/u1/status/1"))
+    assert "url" not in inp.raw_content
+    assert extract_url(inp.raw_content) is None
 
 
 # --- 测试 10：三类 source type 映射（AC-10.1）---
