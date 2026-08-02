@@ -105,3 +105,56 @@ def test_self_heal_failure_is_visible():
     state.self_heal_failed = True
     body, _ = build_health(WorkerSettings(run_mode="db"), state)
     assert body["self_heal_failed"] is True
+
+
+# --- 测试 4：worker 协程死亡必须被 /health 感知（AC-9.3）---
+async def test_worker_crash_marks_dead_and_health_returns_503():
+    """worker 协程抛异常 → worker_state=dead 且 /health 非 200。
+
+    这条守的是最隐蔽的失效模式：worker 以 asyncio.create_task 跑在同一
+    event loop 上时，其未捕获异常**不会终止进程**——只在 gc 时于 stderr 打
+    一行 `Task exception was never retrieved`。此时 worker 已死而进程、HTTP、
+    mode 全部正常，探针会完整地报告「健康」，托管层永远不会重启它。
+    `add_done_callback` 里**取出 task.exception()** 是它的直接解法。
+    """
+    import asyncio
+
+    from agent_hub.main import _on_worker_done
+
+    state = WorkerState(lock_token="w#1")
+
+    async def _boom():
+        raise RuntimeError("worker exploded")
+
+    task = asyncio.create_task(_boom())
+    task.add_done_callback(lambda t: _on_worker_done(state, t))
+    await asyncio.sleep(0)          # 让 task 跑完并触发回调
+    await asyncio.sleep(0)
+
+    assert state.phase == "dead"
+    assert "worker exploded" in (state.dead_reason or "")
+
+    body, code = build_health(WorkerSettings(run_mode="db"), state)
+    assert code == 503, "worker 已死却返回 200 —— 托管层将永远不会重启它"
+    assert body["worker_state"] == "dead"
+
+
+async def test_worker_normal_exit_is_not_dead():
+    """正常退出（停机路径）不应被标 dead——否则每次优雅停机都像崩溃。"""
+    import asyncio
+
+    from agent_hub.main import _on_worker_done
+
+    state = WorkerState(lock_token="w#1")
+
+    async def _clean():
+        return None
+
+    task = asyncio.create_task(_clean())
+    task.add_done_callback(lambda t: _on_worker_done(state, t))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert state.phase == "stopping"
+    _, code = build_health(WorkerSettings(run_mode="db"), state)
+    assert code == 200
