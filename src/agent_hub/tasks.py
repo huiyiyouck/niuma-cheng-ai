@@ -11,6 +11,7 @@ from typing import Callable
 
 from pydantic import BaseModel
 
+from agent_hub.budget import ItemBudget
 from agent_hub.graphs.news_l1 import init_news_l1_state, news_l1_graph
 from agent_hub.llm.client import AIClient
 from agent_hub.schemas import L1Input, L1Output, ToolSummary
@@ -58,9 +59,15 @@ async def run_task(
     inp: BaseModel,
     client: AIClient,
     tools: NewsTools | None = None,
+    budget: ItemBudget | None = None,
 ) -> TaskRunResult:
+    """`budget` 是**数据源无关**的单条 wall-clock 预算（AC-3.8），不违反 AC-2.2。
+
+    缺省时由 `init_news_l1_state` 按 `options.timeout_ms` 兜底，保持 HTTP 模式
+    与 v0.1 等价；DB 模式由 worker 按 `L1_ITEM_BUDGET_MS` 构造后传入。
+    """
     spec = get_task(task_type)
-    state = spec.init_state(run_id, inp, client, tools or DefaultNewsTools())
+    state = spec.init_state(run_id, inp, client, tools or DefaultNewsTools(), budget)
     final = await spec.graph.ainvoke(state)
     output = final.get("output")
     return TaskRunResult(

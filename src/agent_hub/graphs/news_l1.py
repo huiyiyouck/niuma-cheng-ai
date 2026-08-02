@@ -18,6 +18,7 @@ from typing import Literal, Optional, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from agent_hub.budget import ItemBudget
 from agent_hub.llm.client import AIClient
 from agent_hub.llm.prompts import build_news_l1_messages
 from agent_hub.schemas import (
@@ -35,6 +36,8 @@ _ENGINE_TAG = "engine:agent_hub"
 _MIN_RAW_LEN = 300
 _MIN_CTX_LEN = 500
 _LINK_TIMEOUT_MS = 8000
+_KB_TIMEOUT_MS = 15000
+_WEB_SEARCH_TIMEOUT_MS = 20000
 _QUERY_MAX_LEN = 180
 _KB_QUERY_MAX_LEN = 60
 _KB_TOP_N = 5
@@ -72,10 +75,12 @@ class L1State(TypedDict):
     errors: list[StepError]
     llm_result: object  # LLMResult | None
     output: Optional[L1Output]
+    budget: ItemBudget
 
 
 def init_news_l1_state(
-    run_id: str, inp: L1Input, client: AIClient, tools: NewsTools
+    run_id: str, inp: L1Input, client: AIClient, tools: NewsTools,
+    budget: ItemBudget | None = None,
 ) -> L1State:
     return {
         "run_id": run_id,
@@ -90,7 +95,48 @@ def init_news_l1_state(
         "errors": [],
         "llm_result": None,
         "output": None,
+        "budget": budget or ItemBudget(total_ms=inp.options.timeout_ms),
     }
+
+
+def _budget_skipped(state: L1State, tool: str) -> dict:
+    """预算不足以支撑本段：跳过、不发起调用（AC-7 第四分支 / §4.5）。
+
+    **不计 `tool_summary`、也不增 `tool_budget_used`**——未发起调用不应消耗
+    任何一种预算。前者是「发起即计数」口径的自然结果；后者若被消耗，会让
+    `max_tool_calls` 配额被一次根本没发生的调用吃掉，进而影响后续节点路由。
+    """
+    return {
+        "degradations": state["degradations"] + [f"{tool}_budget_exhausted"],
+        "errors": state["errors"]
+        + [StepError(tool, "budget_exhausted", "insufficient budget for segment", True)],
+    }
+
+
+def _tool_outcome(state: L1State, tool: str, result, error_kind: str, items) -> dict:
+    """AC-7 三分支：成功且有结果 / 空结果 / 调用故障（设计 §4.11）。
+
+    v0.1 的两分支缺陷在于把「调用成功但无结果」并进了故障分支——空结果会
+    产出 `degraded:{tool}_failed`，让「没搜到」看起来像「服务挂了」。DB 模式下
+    预取上下文消失、KB 转主动检索，空结果会从边缘情形变成常态，噪声会淹没
+    真故障（§4.11）。三处判断同构，故统一走本函数。
+    """
+    updates: dict = {
+        "tool_summary": _bump_tool(state["tool_summary"], tool),
+        "tool_budget_used": state["tool_budget_used"] + 1,
+    }
+    if not result.ok:
+        # 调用故障：非 200 / 超时 / 连接错误
+        updates["errors"] = state["errors"] + [
+            StepError(tool, error_kind, result.error or "failed", True)
+        ]
+        updates["degradations"] = state["degradations"] + [f"{tool}_failed"]
+    elif result.items:
+        # 成功且有结果
+        updates["context_items"] = state["context_items"] + items
+    # else: 空结果——调用成功但无匹配。不进 degradations、不记 error，
+    # 仅计入 tool_summary（AC-7.1）。
+    return updates
 
 
 def ingest_context_node(state: L1State) -> dict:
@@ -136,99 +182,75 @@ def ingest_context_node(state: L1State) -> dict:
 
 
 async def link_read_node(state: L1State) -> dict:
-    """从 raw_content 约定 key 抓取链接正文。发起即计数，失败可降级继续。"""
+    """从 raw_content 约定 key 抓取链接正文。三分支见 `_tool_outcome`。"""
     inp = state["inp"]
     tools = state["tools"]
-    url = tools.extract_url(inp.raw_content)
-    timeout = min(inp.options.timeout_ms, _LINK_TIMEOUT_MS)
-    result = await tools.read_url(url, timeout)
+    slice_ms = state["budget"].slice_for(_LINK_TIMEOUT_MS)
+    if slice_ms == 0:
+        return _budget_skipped(state, "link_read")
 
-    updates: dict = {
-        "tool_summary": _bump_tool(state["tool_summary"], "link_read"),
-        "tool_budget_used": state["tool_budget_used"] + 1,
-    }
-    if result.ok and result.items:
-        updates["context_items"] = state["context_items"] + [
-            ContextItem(
-                source_type="link",
-                content=item.content,
-                title=item.title,
-                url=item.url or url,
-                metadata={"active": True},
-            )
-            for item in result.items
-        ]
-    else:
-        updates["errors"] = state["errors"] + [
-            StepError("link_read", "fetch_error", result.error or "failed", True)
-        ]
-        updates["degradations"] = state["degradations"] + ["link_read_failed"]
-    return updates
+    url = tools.extract_url(inp.raw_content)
+    result = await tools.read_url(url, slice_ms)
+    items = [
+        ContextItem(
+            source_type="link",
+            content=item.content,
+            title=item.title,
+            url=item.url or url,
+            metadata={"active": True},
+        )
+        for item in result.items
+    ]
+    return _tool_outcome(state, "link_read", result, "fetch_error", items)
 
 
 async def web_search_node(state: L1State) -> dict:
-    """Tavily 搜索补充上下文。发起即计数，失败可降级继续。"""
+    """Tavily 搜索补充上下文。三分支见 `_tool_outcome`。"""
     inp = state["inp"]
     tools = state["tools"]
-    result = await tools.search_web(
-        _build_query(inp), inp.options.max_tool_calls, inp.options.timeout_ms
-    )
+    slice_ms = state["budget"].slice_for(_WEB_SEARCH_TIMEOUT_MS)
+    if slice_ms == 0:
+        return _budget_skipped(state, "web_search")
 
-    updates: dict = {
-        "tool_summary": _bump_tool(state["tool_summary"], "web_search"),
-        "tool_budget_used": state["tool_budget_used"] + 1,
-    }
-    if result.ok and result.items:
-        updates["context_items"] = state["context_items"] + [
-            ContextItem(
-                source_type="web",
-                content=item.content,
-                title=item.title,
-                url=item.url,
-                metadata={"active": True, **item.metadata},
-            )
-            for item in result.items
-        ]
-    else:
-        updates["errors"] = state["errors"] + [
-            StepError("web_search", "search_error", result.error or "failed", True)
-        ]
-        updates["degradations"] = state["degradations"] + ["web_search_failed"]
-    return updates
+    result = await tools.search_web(_build_query(inp), inp.options.max_tool_calls, slice_ms)
+    items = [
+        ContextItem(
+            source_type="web",
+            content=item.content,
+            title=item.title,
+            url=item.url,
+            metadata={"active": True, **item.metadata},
+        )
+        for item in result.items
+    ]
+    return _tool_outcome(state, "web_search", result, "search_error", items)
 
 
 async def kb_search_node(state: L1State) -> dict:
-    """主动库内检索：回调 xiaobao /v1/kb-search（CN-002）。发起即计数，失败可降级。"""
+    """主动库内检索：回调 xiaobao /v1/kb-search（CN-002）。三分支见 `_tool_outcome`。"""
     inp = state["inp"]
     tools = state["tools"]
+    slice_ms = state["budget"].slice_for(_KB_TIMEOUT_MS)
+    if slice_ms == 0:
+        return _budget_skipped(state, "kb_search")
+
     result = await tools.search_kb(
         _build_kb_query(inp),
         _KB_TOP_N,
-        inp.options.timeout_ms,
+        slice_ms,
         domain_tags=inp.domain_tags or None,
     )
-
-    updates: dict = {
-        "tool_summary": _bump_tool(state["tool_summary"], "kb_search"),
-        "tool_budget_used": state["tool_budget_used"] + 1,
-    }
-    if result.ok and result.items:
-        updates["context_items"] = state["context_items"] + [
-            ContextItem(
-                source_type="kb",
-                content=item.content,
-                title=item.title,
-                url=item.url,
-                metadata={"active": True, **item.metadata},
-            )
-            for item in result.items
-        ]
-    else:
-        updates["errors"] = state["errors"] + [
-            StepError("kb_search", "kb_error", result.error or "failed", True)
-        ]
-        updates["degradations"] = state["degradations"] + ["kb_search_failed"]
-    return updates
+    items = [
+        ContextItem(
+            source_type="kb",
+            content=item.content,
+            title=item.title,
+            url=item.url,
+            metadata={"active": True, **item.metadata},
+        )
+        for item in result.items
+    ]
+    return _tool_outcome(state, "kb_search", result, "kb_error", items)
 
 
 def route_after_ingest(state: L1State) -> str:
@@ -332,7 +354,7 @@ async def llm_process_node(state: L1State) -> dict:
     inp = state["inp"]
     messages = build_news_l1_messages(inp, state["context_items"])
     try:
-        result = await client.complete_json(messages, timeout_ms=inp.options.timeout_ms)
+        result = await client.complete_json(messages, timeout_ms=state["budget"].remaining_ms())
     except Exception as exc:  # noqa: BLE001 — 全 provider 失败统一降级为完全失败
         err = StepError(
             step="llm_process",
