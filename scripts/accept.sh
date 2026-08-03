@@ -67,7 +67,7 @@ async def main():
         cur = await c.execute(
             "SELECT content->>'text', source_item_url FROM raw_items"
             " WHERE process_type='ai' AND length(content->>'text') > 120"
-            " ORDER BY created_at DESC LIMIT 1")
+            " ORDER BY published_at DESC NULLS LAST LIMIT 1")
         row = await cur.fetchone()
     if not row:
         print("  ⚠ 小报库里没找到合适的真实样本，跳过"); return
@@ -305,12 +305,13 @@ async def main():
     async with await psycopg.AsyncConnection.connect(ADMIN) as c:
         cur = await c.execute(
             "SELECT count(*) FILTER (WHERE locked_by IS NOT NULL),"
-            " count(*) FILTER (WHERE status='queued' AND attempt=0),"
+            " count(*) FILTER (WHERE status='queued'),"
             " count(*) FILTER (WHERE status='succeeded'),"
             " count(*) FILTER (WHERE last_error_kind IS NOT NULL) FROM tasks")
         locked, back, done, errs = await cur.fetchone()
     print(f"  残留锁：{locked} 条    已完成：{done} 条")
-    print(f"  退回队列且**未烧重试次数**：{back} 条    被误标成失败：{errs} 条")
+    print(f"  退回队列等下次处理：{back} 条    被误标成失败：{errs} 条"
+          f"（release 只退状态、不写 last_error，所以这里必须是 0）")
     print("  过 ✅" if locked == 0 and errs == 0 and back + done == 3 else "  未过 ❌")
 
 asyncio.run(main())
