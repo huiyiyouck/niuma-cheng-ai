@@ -5,12 +5,15 @@
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
 from uuid import UUID
 
+import psycopg
 from psycopg.types.json import Jsonb
+from psycopg_pool import PoolTimeout
 
 from agent_hub.config import WorkerSettings
 from agent_hub.sources.base import ClaimedItem, SourceRecord, WriteBackPayload
@@ -28,6 +31,30 @@ class DbPullSource:
         self._pool = pool
         self._s = settings
         self._lock_token = lock_token
+
+    def classify_error(self, exc: BaseException) -> tuple[str, bool]:
+        """驱动异常 → `(error_kind, 是否值得重试)`（设计 §4.6 / CN-010 变更 6、7）。
+
+        **可重试用白名单制**：只有明确可重试的才为 True，其余一律当确定性
+        错误。反过来写（黑名单）会让每一类新出现的错误默认进入重试，而重试
+        一次的代价是 240s 算力 + 一次 LLM 调用费 + 一条 `attempt`。
+
+        `TimeoutError` 是 `run_tx` 把事务超时转换后的形态；`CancelledError`
+        不在此列——它是 `BaseException`，优雅停机要靠它穿透。
+        """
+        if isinstance(exc, (asyncio.TimeoutError, PoolTimeout)):
+            return "db_error", True
+        if isinstance(exc, psycopg.Error):
+            state = getattr(exc, "sqlstate", None) or ""
+            # 40001 serialization_failure / 40P01 deadlock_detected / 08* 连接异常
+            retryable = (
+                state in ("40001", "40P01")
+                or state.startswith("08")
+                # 无 sqlstate 的 OperationalError：连接建立失败等环境类问题
+                or (isinstance(exc, psycopg.OperationalError) and not state)
+            )
+            return "db_error", retryable
+        return "unexpected", False
 
     # ── claim（§4.3）────────────────────────────────────────────────
     async def fetch_batch(self, n: int) -> list[ClaimedItem]:

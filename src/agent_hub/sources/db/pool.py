@@ -31,7 +31,9 @@ def build_conninfo(s: WorkerSettings) -> str:
     return (
         f"host={s.db_host} port={s.db_port} dbname={s.db_name} "
         f"user={s.db_user} password={s.db_password} "
-        f"connect_timeout={max(1, s.connect_timeout_ms // 1000)}"
+        # 用生效值：libpq 下限 2s，写 1 会被解释成 2；门禁比的也是这个值，
+        # 两处必须同源，否则门禁又在断言一个不生效的数（CN-010 变更 2）
+        f"connect_timeout={s.effective_connect_timeout_s}"
     )
 
 

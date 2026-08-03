@@ -374,13 +374,17 @@ def normalize_output_node(state: L1State) -> dict:
 
     parsed: dict = result.parsed or {}
     scores = parsed.get("scores") or {}
+    missing_dims: list[str] = []
 
     def dim(name: str) -> ScoreDimension:
-        d = scores.get(name) or {}
-        return ScoreDimension(
-            score=_clamp_score(d.get("score", 0)),
-            reason=str(d.get("reason", "")),
-        )
+        raw = scores.get(name)
+        d = raw if isinstance(raw, dict) else {}
+        # **不给 .get 默认值**：缺键要落进 _clamp_score 的无效分支，给了 0
+        # 就变成「有效的 0 分」——伪 0 与真 0 混在同一取值里正是本条要解的问题
+        score, ok = _clamp_score(d.get("score"))
+        if not ok:
+            missing_dims.append(name)
+        return ScoreDimension(score=score, reason=str(d.get("reason", "")))
 
     # context 引用校验：只保留证据（预取 / 工具结果）中真实出现的 URL，过滤 LLM 编造
     evidence_urls = {ci.url for ci in state["context_items"] if ci.url}
@@ -391,8 +395,26 @@ def normalize_output_node(state: L1State) -> dict:
     ]
 
     raw_tags = parsed.get("tags") or {}
+
+    # **先求值 score_dimensions**：dim() 在其中填 missing_dims，而下面的
+    # processing 要用它。靠 L1Output(...) 的参数求值顺序来保证是隐式依赖，
+    # 调换一次参数位置就会静默失效
+    score_dimensions = ScoreDimensions(
+        timeliness=dim("timeliness"),
+        impact=dim("impact"),
+        confidence=dim("confidence"),
+        clarity=dim("clarity"),
+    )
+
+    degradations = list(state["degradations"])
+    if missing_dims:
+        # 明细带在冒号后：CN-011 变更 2 要求「标记单段、明细进 degradations
+        # 日志」，但 degradations **本身就是标记的来源**——明细进它等于进标记。
+        # 故生成标记时只取冒号前一段，两个要求才能同时满足
+        degradations.append(f"scores_missing:{','.join(missing_dims)}")
+
     processing = [_ENGINE_TAG, f"llm:{result.provider_name}"]
-    processing.extend(f"degraded:{d}" for d in state["degradations"])
+    processing.extend(f"degraded:{d.split(':', 1)[0]}" for d in degradations)
     processing.extend(f"degraded:{d}" for d in result.degradations)
 
     output = L1Output(
@@ -401,12 +423,7 @@ def normalize_output_node(state: L1State) -> dict:
         translation=parsed.get("translation") or {},
         context=context,
         analysis=parsed.get("analysis"),
-        score_dimensions=ScoreDimensions(
-            timeliness=dim("timeliness"),
-            impact=dim("impact"),
-            confidence=dim("confidence"),
-            clarity=dim("clarity"),
-        ),
+        score_dimensions=score_dimensions,
         tags=Tags(
             domain=list(raw_tags.get("domain") or []),
             entity=list(raw_tags.get("entity") or []),
@@ -417,15 +434,38 @@ def normalize_output_node(state: L1State) -> dict:
         needs_context=bool(parsed.get("needs_context", False))
         or _context_insufficient(state),
     )
-    return {"output": output, "needs_context": output.needs_context}
+    # degradations 一并回写：TaskResult 从 final state 取它，process_one 的
+    # slog.degradations 因此能记到缺了哪几维（CN-011 变更 2 的日志侧）
+    return {
+        "output": output,
+        "needs_context": output.needs_context,
+        "degradations": degradations,
+    }
 
 
-def _clamp_score(value) -> int:
+def _clamp_score(value) -> tuple[int, bool]:
+    """→ `(分值, 这个分是不是真的)`（CN-011 变更 1）。
+
+    **有效性判定必须由这里给出，不能在调用处另写一套**：调用处若自己判
+    「是不是 dict」，就等于在本函数之外重新实现了一遍「什么算有效 score」，
+    两套得永远同步，而分叉时不会有任何信号——这正是 CN-011 理由 2 反对的
+    那种依赖，只不过换了个位置又长出来一次（Developer 末票中①）。
+
+    落进伪 0 的输入不止「维度对象缺失」一种，实测还有：有对象但无 `score`
+    键、`score` 是 `"high"` 这类字符串、`score` 为 `null`——**这三种比整体
+    缺失更可能发生**（prompt 给了 schema，LLM 的结构骨架通常是对的，错的
+    往往是某个值）。
+
+    `bool` 单独挡掉：它是 `int` 子类，`int(True)` 得 **1**，会把一个非法值
+    当成 1 分收下（Developer 末票顺带项，成本一行）。
+    """
+    if isinstance(value, bool):
+        return 0, False
     try:
         n = int(value)
     except (TypeError, ValueError):
-        return 0
-    return max(0, min(5, n))
+        return 0, False
+    return max(0, min(5, n)), True
 
 
 def _extract_url(raw_content: dict) -> Optional[str]:

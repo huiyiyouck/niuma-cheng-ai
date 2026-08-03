@@ -171,3 +171,20 @@ class PullSource(Protocol):
 
     async def reclaim_own_stale_locks(self) -> int:
         """启动自愈：仅回收 `worker_id` 相同、`run_token` 不同的残留锁（AC-5.6）。"""
+
+    def classify_error(self, exc: BaseException) -> tuple[str, bool]:
+        """驱动异常 → `(error_kind, 是否值得重试)`（设计 §4.6 / CN-010 变更 6、7）。
+
+        **判定必须由数据源层给出，不能让 worker 层自己判**：那需要 worker
+        `import psycopg`，而它是数据源无关的编排层（AC-2.2）。这里是「驱动
+        异常 → 语义」的唯一翻译点，两个调用方各取所需——主循环取 `kind` 决定
+        计不计入判死，写回重试取 `retryable` 决定还试不试。
+
+        - `("db_error", True)`：连接类、`deadlock_detected`、
+          `serialization_failure`、事务超时——重试一次可能就好了；
+        - `("db_error", False)`：约束冲突、权限拒绝、数据类型错误——**同一份
+          数据重试多少次都是同样结果**，重试只是白烧 `attempt` 和算力；
+        - `("unexpected", False)`：根本不来自 DB（处理核心的代码 bug、未注册
+          的 source type）。**这一类若被标成 `db_error`，运维会照日志去查 DB
+          并查到「一切正常」——会说谎的日志比没有日志更费时间。**
+        """

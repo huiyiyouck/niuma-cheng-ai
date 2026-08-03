@@ -49,6 +49,16 @@ def build_health(settings: WorkerSettings, state: WorkerState | None) -> tuple[d
             "stale_tolerance_ms": (
                 settings.claim_batch_size * settings.item_budget_ms + settings.poll_interval_ms
             ),
+            # 连续失败期间 worker 仍 running、状态码仍 200——**判死之前它就是
+            # 「活着但在挣扎」，这正是要暴露的信息，不是要改判的状态**。不暴露
+            # 的话，5 分钟的自愈能力会变成 5 分钟的静默：运维看到「服务 200、
+            # 队列不动」，与「一切正常但队列本来就空」在探针上完全同形
+            # （CN-010 变更 4，与 `self_heal_failed` 同一条推理）
+            "consecutive_db_failures": state.consecutive_db_failures,
+            # 与上一个分开：claim 失败是「DB 不可达」，写回失败是「可达但写不
+            # 进」。后者下 claim 一直成功，合并计数会**恒为 0**，而队列正被
+            # 静默烧成 final_failed（CN-010 变更 6）
+            "consecutive_writeback_failures": state.consecutive_writeback_failures,
             "dead_reason": state.dead_reason,
             "self_heal_failed": state.self_heal_failed,
         }

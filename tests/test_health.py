@@ -90,6 +90,45 @@ def test_consecutive_empty_polls_exposed():
     assert body["consecutive_empty_polls"] == 0
 
 
+# --- 测试 33：连续失败计数暴露（CN-010 变更 4、6）---
+def test_consecutive_failure_counters_exposed_while_still_200():
+    """连续失败期间 worker 仍 `running`、状态码仍 **200**。
+
+    **判死之前它就是「活着但在挣扎」，这正是要暴露的信息，不是要改判的状态。**
+    不暴露的话，5 分钟的自愈能力会变成 5 分钟的静默——运维看到「服务 200、
+    队列不动」，与「一切正常但队列本来就空」在探针上完全同形。
+    """
+    settings = WorkerSettings(run_mode="db")
+    state = WorkerState(lock_token="w#1")
+
+    body, code = build_health(settings, state)
+    assert (body["consecutive_db_failures"], body["consecutive_writeback_failures"]) == (0, 0)
+
+    state.consecutive_db_failures = 4
+    state.consecutive_writeback_failures = 2
+    body, code = build_health(settings, state)
+    assert code == 200                      # 挣扎中不改判状态
+    assert body["worker_state"] == "running"
+    assert body["consecutive_db_failures"] == 4
+    assert body["consecutive_writeback_failures"] == 2
+
+
+def test_two_failure_counters_are_independent():
+    """两个计数分开，是因为它们的根因与处置方向都不同。
+
+    claim 失败 = DB 不可达；写回失败 = 可达但写不进。后者下 claim **一直
+    成功**，若共用一个计数就会被清零成 0，而队列正被静默烧成 `final_failed`。
+    """
+    settings = WorkerSettings(run_mode="db")
+    state = WorkerState(lock_token="w#1")
+    state.consecutive_writeback_failures = 3
+    state.consecutive_db_failures = 0       # claim 一直成功
+
+    body, _ = build_health(settings, state)
+    assert body["consecutive_db_failures"] == 0
+    assert body["consecutive_writeback_failures"] == 3
+
+
 def test_stale_tolerance_is_computed_server_side():
     """由服务端算好给运维，避免两侧各算一遍算错（§3.6）。"""
     settings = WorkerSettings(run_mode="db")

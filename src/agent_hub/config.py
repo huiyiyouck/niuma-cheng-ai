@@ -151,10 +151,59 @@ class WorkerSettings:
     writeback_retry: int = 2
     writeback_retry_delay_ms: int = 1000
 
+    loop_failure_limit: int = 15
+    """主循环连续 DB 失败多少次后判死（CN-010 变更 1/3）。
+
+    **15 而非 20**：一轮失败的真实周期是 `tx_timeout + poll_interval = 20s`，
+    不是 `poll_interval = 15s`——每次失败**自身**要先耗掉一个事务超时才走到
+    sleep。按真实周期，20 次得 400s，已越过不变式 4 的 360s 线。
+    """
+
+    writeback_failure_limit: int = 3
+    """写回连续失败多少次后判死（CN-010 变更 6）。
+
+    **阈值只有 claim 的五分之一，因为单次代价差两个数量级**：claim 失败一次
+    = 20s 空转；写回失败一次 = 240s 算力 + 一次 LLM 调用费 + 烧掉一条
+    `attempt`，且该条已内部重试过才算一次。3 条连续失败 ≈ 13 分钟，足以排除
+    偶发，同时把烧掉的 `attempt` 控制在 3 条以内。
+    """
+
     # 对方的卡死回收阈值。**600s 不是 1800s**——1800 是契约起草时臆定、无实现
     # 依据的数字，实际为其 AI_STALE_TIMEOUT_MS 默认值 600000ms，test/prod 生效值
     # 均已核实（2026-07-30 其 Architect 主动查出，契约 v1.7 回填）。
     stale_timeout_ms: int = 600000
+
+    @property
+    def effective_connect_timeout_s(self) -> int:
+        """libpq 实际生效的建连超时（秒）——**不等于配置值**（CN-010 变更 2）。
+
+        libpq 的 `connect_timeout` 下限是 **2 秒**，写 1 会被解释成 2。实测
+        （psycopg 连不可路由地址）：`1 → 2.02s`、`2 → 2.02s`、`3 → 3.03s`。
+        门禁若按配置值 1000 断言，就是在断言一个不生效的数：把
+        `AI_DB_LOCK_TIMEOUT_MS` 调到 2000 以下时门禁仍放行，而实际
+        `connect(2000) > lock(1800)`，三层超时的日志区分意图静默失效。
+
+        **用 floor 而非 round**：`round` 是银行家舍入，`3500 → 4`——配 3.5s
+        得 4s，**生效值超出配置意图**；floor 下 `3500 → 3`。对超时量，只可
+        少不可多（Developer 票低③）。
+
+        **默认值不改成 2000**：那会让「配什么就生效什么」看起来成立，反而
+        藏起 libpq 的下限语义，下一个把它调到 1500 的人会再踩一次。
+        """
+        return max(2, self.connect_timeout_ms // 1000)
+
+    @property
+    def loop_failure_window_ms(self) -> int:
+        """判死窗口 = 失败次数 × 一轮失败的真实周期（CN-010 变更 3）。
+
+        **一轮是 `tx + poll` 不是 `poll`**：`fetch_batch` 经 `run_tx`，失败前
+        先被 `asyncio.wait_for` 封顶一个 `tx_timeout`，之后才退避一个轮询间隔。
+        漏掉 `tx` 这一项正是本迭代第七次「校验通过但保证不成立」。
+
+        `run_tx` **不含重试**（重试只在写回），故一轮的上界就到此为止——若它
+        当初也做了重试，这里还要再乘一次尝试数。
+        """
+        return self.loop_failure_limit * (self.poll_interval_ms + self.tx_timeout_ms)
 
     @property
     def writeback_bound_ms(self) -> int:
@@ -206,6 +255,8 @@ def load_worker_settings() -> WorkerSettings:
         min_segment_ms=_int_env("L1_MIN_SEGMENT_MS", 1000),
         writeback_retry=_int_env("L1_WRITEBACK_RETRY", 2),
         writeback_retry_delay_ms=_int_env("L1_WRITEBACK_RETRY_DELAY_MS", 1000),
+        loop_failure_limit=_int_env("L1_LOOP_FAILURE_LIMIT", 15),
+        writeback_failure_limit=_int_env("L1_WRITEBACK_FAILURE_LIMIT", 3),
         stale_timeout_ms=_int_env("AI_STALE_TIMEOUT_MS", 600000),
     )
 
@@ -251,10 +302,29 @@ def validate_worker_settings(s: WorkerSettings) -> WorkerSettings:
             f"须满足 lock({s.lock_timeout_ms}) < statement({s.statement_timeout_ms})"
             f" < tx({s.tx_timeout_ms})"
         )
-    if s.connect_timeout_ms >= s.tx_timeout_ms:
+    # 比的是**生效值**不是配置值：libpq 下限 2s，配 1000 实际按 2000 跑
+    effective_connect_ms = s.effective_connect_timeout_s * 1000
+    if effective_connect_ms >= s.tx_timeout_ms:
         errors.append(
-            f"AI_DB_CONNECT_TIMEOUT_MS={s.connect_timeout_ms} 须 < tx({s.tx_timeout_ms})"
+            f"connect 生效值 {effective_connect_ms}ms"
+            f"（配置 {s.connect_timeout_ms}，libpq 下限 2s）须 < tx({s.tx_timeout_ms})"
             f"——建连耗时计入事务预算，否则重试会全耗在建连上"
+        )
+
+    # 不变式 4：判死窗口须显著短于对方卡死回收，否则会出现「ai 已装死但未判死、
+    # 条目被对方反复回收」的窗口，而不会有任何信号（CN-010 变更 3）
+    loop_window_limit = int(s.stale_timeout_ms * 0.6)
+    if s.loop_failure_window_ms >= loop_window_limit:
+        errors.append(
+            f"判死窗口 = LIMIT {s.loop_failure_limit} ×"
+            f"（poll {s.poll_interval_ms} + tx {s.tx_timeout_ms}）"
+            f" = {s.loop_failure_window_ms}ms 须 < {loop_window_limit}ms"
+            f"（卡死阈值 {s.stale_timeout_ms} × 0.6）"
+        )
+    if s.loop_failure_limit < 1 or s.writeback_failure_limit < 1:
+        errors.append(
+            f"L1_LOOP_FAILURE_LIMIT={s.loop_failure_limit} /"
+            f" L1_WRITEBACK_FAILURE_LIMIT={s.writeback_failure_limit} 须 ≥1"
         )
 
     if s.run_mode == "db":

@@ -53,6 +53,26 @@ class WorkerState:
     """启动自愈失败不阻止启动（DevOps R1 问题 3）——可用性优先，但须在
     `/health` 暴露，否则残留锁会静默等对方的回收阈值。"""
 
+    consecutive_db_failures: int = 0
+    """主循环连续 DB 失败次数（CN-010 变更 1/4）。
+
+    连续失败期间 worker 仍 `running`、`/health` 仍 200——**判死之前它就是
+    「活着但在挣扎」，这正是要暴露的信息，不是要改判的状态**。不暴露的话，
+    5 分钟的自愈能力会变成 5 分钟的静默：运维看到「服务 200、队列不动」，
+    与「一切正常但队列本来就空」在探针上完全同形。
+    """
+
+    consecutive_writeback_failures: int = 0
+    """写回连续失败次数（CN-010 变更 6）。
+
+    **与 `consecutive_db_failures` 分开计**：claim 失败是「DB 不可达」，写回
+    失败是「可达但写不进」——根因不同、处置方向不同，合并计数会连判死理由
+    一起搞混，而灰度期第一时间要判的正是这两者的区别。
+
+    合并还会漏报：claim 成功就把计数清零，而 DB「可达但写不进」时 claim 恰恰
+    一直成功——那个计数会**恒为 0**，整个队列被静默烧成 `final_failed`。
+    """
+
     @property
     def worker_id(self) -> str:
         return worker_id_of(self.lock_token)

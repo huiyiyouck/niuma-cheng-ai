@@ -77,6 +77,62 @@ def test_timeout_layering_is_enforced(over):
         validate_worker_settings(WorkerSettings(**over))
 
 
+# --- 测试 30：connect_timeout 生效值归一（CN-010 变更 2）---
+@pytest.mark.parametrize(
+    "configured, effective",
+    [
+        (500, 2), (1000, 2), (1500, 2),
+        # 2500 / 3500 是**鉴别用例**：CN 原定的四个值（500/1000/1500/3000）
+        # 在 round 与 floor 下结果逐个相同，对两种实现零鉴别力。3500 才暴露
+        # 差异——round 给 4（银行家舍入，生效值**超出**配置意图），floor 给 3
+        (2500, 2), (3000, 3), (3500, 3),
+    ],
+)
+def test_effective_connect_timeout_uses_floor_with_libpq_floor_of_2s(configured, effective):
+    """libpq 的 `connect_timeout` 下限是 2 秒，写 1 会被解释成 2。
+
+    门禁若按配置值断言，就是在断言一个不生效的数：把 `lock_timeout` 调到
+    2000 以下时门禁仍放行，而实际 `connect(2000) > lock(1800)`，三层超时的
+    日志区分意图静默失效。
+    """
+    s = WorkerSettings(connect_timeout_ms=configured)
+    assert s.effective_connect_timeout_s == effective
+
+
+def test_gate_compares_effective_connect_timeout_not_configured():
+    """配置值看着合法、生效值已越界的组合必须被拒（这正是本条的存在理由）。"""
+    # 配置 1000 < lock 1800 看似通过，但生效值 2000 > 1800
+    with pytest.raises(ConfigInvariantError):
+        validate_worker_settings(
+            WorkerSettings(connect_timeout_ms=1000, lock_timeout_ms=1800,
+                           statement_timeout_ms=2500, tx_timeout_ms=1900)
+        )
+
+
+# --- 测试 32：不变式 4 —— 判死窗口 < 对方卡死回收 × 0.6（CN-010 变更 3）---
+def test_loop_failure_window_within_stale_threshold():
+    s = validate_worker_settings(WorkerSettings())
+    # 一轮失败的真实周期是 tx + poll = 20s，不是 poll = 15s
+    assert s.loop_failure_window_ms == 15 * (15000 + 5000) == 300000
+    assert s.loop_failure_window_ms < int(s.stale_timeout_ms * 0.6)
+
+
+@pytest.mark.parametrize(
+    "over, why",
+    [
+        ({"loop_failure_limit": 20}, "20 × 20s = 400s ≥ 360s —— CN 现场查出的越界值"),
+        ({"poll_interval_ms": 30000}, "15 × 35s = 525s，poll 配到区间上限即越界"),
+    ],
+    ids=["limit_20_rejected", "poll_at_upper_bound_rejected"],
+)
+def test_loop_failure_window_violations_are_rejected(over, why):
+    """**`LIMIT=20` 必须被拒**——它是变更 1 原定的默认值，按漏算 tx 的旧公式
+    算得过、按真实周期算不过。这条不变式的价值就在于把这种「式子算得过」挡住。
+    """
+    with pytest.raises(ConfigInvariantError):
+        validate_worker_settings(WorkerSettings(**over))
+
+
 def test_db_mode_missing_credentials_is_rejected():
     with pytest.raises(ConfigInvariantError) as ei:
         validate_worker_settings(WorkerSettings(run_mode="db"))
