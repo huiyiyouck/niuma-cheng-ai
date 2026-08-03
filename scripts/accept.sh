@@ -20,7 +20,8 @@ cd "$APP_DIR"
 PY="$APP_DIR/.venv/bin/python"
 PGPW=$(grep -E "^AI_DB_PASSWORD=" "$ENV_FILE" | cut -d= -f2-)
 export PYTHONPATH="$APP_DIR/src" APP_DIR ENV_FILE ITEST_DB PGPW
-export ADMIN_DSN="dbname=$ITEST_DB user=postgres"
+export ADMIN_DSN="host=127.0.0.1 dbname=$ITEST_DB user=itest_seeder password=itest_seed_pw"
+export NEWS_RO_DSN="host=127.0.0.1 dbname=news_test user=ai_worker password=$PGPW"
 export WORKER_DSN="host=127.0.0.1 dbname=$ITEST_DB user=ai_worker password=$PGPW"
 
 hr() { printf '%.0s─' {1..72}; echo; }
@@ -30,7 +31,7 @@ sec "【1】它能不能把一条真新闻处理好　← 只有这项需要你�
 "  验：取一条**真实推文**（从小报库只读复制），交给真实 AI 出标题/摘要/评分/标签
   过：下面的结果读起来是对的——标题贴切、每个评分都有像样的理由、标签不离谱
   说明：其余四项验的是「不出事」，只有这项验「干得好不好」"
-sudo -u postgres -E "$PY" - <<'PY'
+"$PY" - <<'PY'
 import asyncio, json, os, sys, time
 from uuid import uuid4
 import psycopg
@@ -62,7 +63,7 @@ ADMIN, PW, DB = os.environ["ADMIN_DSN"], os.environ["PGPW"], os.environ["ITEST_D
 
 async def main():
     # 只读取一条真实推文（SELECT，不动 news_test 的任何状态）
-    async with await psycopg.AsyncConnection.connect("dbname=news_test user=postgres") as c:
+    async with await psycopg.AsyncConnection.connect(os.environ["NEWS_RO_DSN"]) as c:
         cur = await c.execute(
             "SELECT content->>'text', source_item_url FROM raw_items"
             " WHERE process_type='ai' AND length(content->>'text') > 120"
@@ -124,7 +125,7 @@ PY
 sec "【2】AI 处理失败了会不会丢数据" \
 "  验：让 AI 调用必然失败，看那条新闻是被丢掉还是排队重来
   过：状态回到 queued 等重试、attempt +1、锁已释放"
-sudo -u postgres -E "$PY" - <<'PY'
+"$PY" - <<'PY'
 import asyncio, json, os, sys
 from uuid import uuid4
 import psycopg
@@ -182,7 +183,7 @@ sec "【3】数据库重启会不会丢数据　← 本迭代最后一轮才修�
   过：判为「可重试」——等数据库回来接着做，而不是当成坏数据永久放弃
   改之前：会把撞上重启的**正常新闻**一次不重试地烧成永久失败，且不告警。
           每条白烧 4 分钟算力 + 一次 AI 调用费，而那条数据本身没有任何问题"
-sudo -u postgres -E "$PY" - <<'PY'
+"$PY" - <<'PY'
 import asyncio, os, sys
 import psycopg
 sys.path.insert(0, os.environ["APP_DIR"])
@@ -222,7 +223,7 @@ sec "【4】服务卡住了能不能看出来" \
   过：写回失败计数在涨、服务仍报 200（还在挣扎，不是已死）
   为什么两个计数要分开：这个场景下领取任务一直成功，合成一个计数它会**恒为 0**，
   队列被逐条烧光而所有探针显示一切正常"
-sudo -u postgres -E "$PY" - <<'PY'
+"$PY" - <<'PY'
 import asyncio, os, sys
 sys.path.insert(0, os.environ["APP_DIR"])
 from agent_hub.config import WorkerSettings
@@ -248,7 +249,7 @@ PY
 sec "【5】重启服务会不会留下脏数据" \
 "  验：处理到一半收到停机信号，看有没有留下「锁着但没人处理」的条目
   过：残留锁 0 条；未开始的条目原样退回队列——不算失败、不烧重试次数"
-sudo -u postgres -E "$PY" - <<'PY'
+"$PY" - <<'PY'
 import asyncio, json, os, sys
 from uuid import uuid4
 import psycopg
@@ -311,8 +312,7 @@ PY
 
 sec "【附】自动化测试（不需要看懂，只看有没有 failed）" "  过：两行都是 passed"
 "$PY" -m pytest -q --ignore=tests/integration 2>&1 | tail -1
-sudo -u postgres env AI_ITEST_DSN="$WORKER_DSN" AI_ITEST_ADMIN_DSN="$ADMIN_DSN" \
-    PYTHONPATH="$APP_DIR/src" "$PY" -m pytest tests/integration -q -p no:cacheprovider 2>&1 | tail -1
+AI_ITEST_DSN="$WORKER_DSN" AI_ITEST_ADMIN_DSN="$ADMIN_DSN" "$PY" -m pytest tests/integration -q -p no:cacheprovider 2>&1 | tail -1
 
 echo; hr
 echo "验收要点：【1】看 AI 干得好不好（只有你能判断）；【2】~【5】看到「过 ✅」即可。"
