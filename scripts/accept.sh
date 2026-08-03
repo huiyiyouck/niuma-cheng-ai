@@ -120,6 +120,8 @@ async def main():
           f" / score_total={total}（必须是 None，这列归小报算）")
     print("  过 ✅" if l1 == "completed" and ts == "succeeded" and title and total is None
           else "  未过 ❌")
+
+asyncio.run(main())
 PY
 
 sec "【2】AI 处理失败了会不会丢数据" \
@@ -176,6 +178,8 @@ async def main():
     print(f"  下次重试：{backoff} 秒后（退避，不会立刻死循环）")
     print(f"  新闻状态：{l1}")
     print("  过 ✅" if st == "queued" and att == 1 and lock is None and backoff > 0 else "  未过 ❌")
+
+asyncio.run(main())
 PY
 
 sec "【3】数据库重启会不会丢数据　← 本迭代最后一轮才修好的" \
@@ -308,6 +312,8 @@ async def main():
     print(f"  残留锁：{locked} 条    已完成：{done} 条")
     print(f"  退回队列且**未烧重试次数**：{back} 条    被误标成失败：{errs} 条")
     print("  过 ✅" if locked == 0 and errs == 0 and back + done == 3 else "  未过 ❌")
+
+asyncio.run(main())
 PY
 
 sec "【附】自动化测试（不需要看懂，只看有没有 failed）" "  过：两行都是 passed"
