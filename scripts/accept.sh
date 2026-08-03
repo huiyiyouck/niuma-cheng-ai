@@ -39,16 +39,13 @@ sys.path.insert(0, os.environ["APP_DIR"])
 from dotenv import load_dotenv
 load_dotenv(os.environ["ENV_FILE"])
 
-# LLM 凭据取自 openclaw（部署 .env 里那个 CodingPlan 订阅已过期，归 DevOps 更新）
-oc = json.load(open("/root/.openclaw/openclaw.json"))["models"]["providers"]
-key = lambda p: next(p[k] for k in p if k.lower() in ("apikey", "api_key"))
-os.environ["VOLC_PLAN_KEY"] = key(oc["volcengine-plan"])
-os.environ["DEEPSEEK_KEY"] = key(oc["deepseek"])
-os.environ["LLM_PROVIDERS_JSON"] = json.dumps([
-    {"name": "volcengine-plan", "base_url": oc["volcengine-plan"]["baseUrl"],
-     "api_key_env": "VOLC_PLAN_KEY", "model": "doubao-seed-2.0-pro", "timeout_ms": 120000},
-    {"name": "deepseek", "base_url": oc["deepseek"]["baseUrl"],
-     "api_key_env": "DEEPSEEK_KEY", "model": "deepseek-v4-pro", "timeout_ms": 120000}])
+# **用部署 .env 里的 LLM 配置，不再临时借 openclaw 的 key**：验收脚本若绕过部署
+# 配置，就验不到「配置到底修好没有」——那正是「验证者绕开了被验证者」。
+# 部署配置若不可用，这一项会失败，而那本身就是一个必须暴露的验收结果。
+if not (os.getenv("LLM_PROVIDERS_JSON") or os.getenv("OPENAI_API_KEY")):
+    print("  ❌ 部署 .env 里没有可用的 LLM 配置（LLM_PROVIDERS_JSON / OPENAI_API_KEY 均为空）")
+    print("     这是 INDEX 里那条 P0 待办，须先由 DevOps 更新部署配置")
+    sys.exit(0)
 
 from agent_hub.config import WorkerSettings
 from agent_hub.llm.client import build_ai_client
@@ -97,6 +94,8 @@ async def main():
     await process_one(src, DbL1Mapper(), items[0], WorkerState(lock_token="acc#1"), s,
                       client=build_ai_client(), tools=DefaultNewsTools())
     elapsed = time.monotonic() - t0
+    providers = [p.name for p in __import__("agent_hub.config", fromlist=["x"]).load_providers()]
+    print(f"  用的是部署 .env 里配的 provider：{providers}")
     await pool.close()
 
     async with await psycopg.AsyncConnection.connect(ADMIN) as c:
