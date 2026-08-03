@@ -103,6 +103,16 @@ async def lifespan(app: FastAPI):
                   extra={"fields": {"step": "shutdown", "status": "failed",
                                     "grace_ms": settings.shutdown_grace_ms}})
         task.cancel()
+        # **必须等取消真正完成**：`cancel()` 只是「请求」取消。不等的话
+        # `lifespan` 的 finally 走完 → ASGI 生命周期结束 → **进程退出，而 worker
+        # 协程的取消尚未完成**，它持有的事务随进程一起没了，留下残留锁等对方
+        # 600s 回收——而这条路径只在宽限期耗尽时进入，恰恰是最需要收干净的时刻。
+        #
+        # 注意机理：**不是「池把使用中的连接抽走」**。`psycopg_pool.close()` 只关
+        # 池内空闲连接（"Currently used connections will not be closed until
+        # returned to the pool"），给它加更大的 timeout 完全无效——那个 timeout
+        # 等的是池的内部维护 task。唯一有效的修法就是等 task 自己结束（CN-010 变更 9）。
+        await asyncio.gather(task, return_exceptions=True)
     finally:
         await pool.close()
 

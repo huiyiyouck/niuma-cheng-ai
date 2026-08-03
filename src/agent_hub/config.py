@@ -296,19 +296,23 @@ def validate_worker_settings(s: WorkerSettings) -> WorkerSettings:
             f" = {s.claim_batch_size * per_item}ms 须 < {limit}ms（卡死阈值 {s.stale_timeout_ms} × 0.6）"
         )
 
-    # 不变式 3：等锁应比查询慢更早触发，单语句须早于整事务——便于日志区分三者
-    if not s.lock_timeout_ms < s.statement_timeout_ms < s.tx_timeout_ms:
-        errors.append(
-            f"须满足 lock({s.lock_timeout_ms}) < statement({s.statement_timeout_ms})"
-            f" < tx({s.tx_timeout_ms})"
-        )
-    # 比的是**生效值**不是配置值：libpq 下限 2s，配 1000 实际按 2000 跑
+    # 不变式 3：四个超时量逐层放大，**一条四元链**（PRD AC-4.7「四个超时量全部进
+    # 启动门禁、无一遗留在外」；CN-010 变更 8）。
+    #
+    # 拆成「lock < statement < tx」+「connect < tx」两条独立判断时，**connect 与
+    # lock/statement 之间没有任何约束**：实测 `AI_DB_CONNECT_TIMEOUT_MS=4500` 被
+    # 放行，而此时 connect(生效 4000) ≥ statement(4000)，「便于在日志中区分建连慢 /
+    # 等锁 / 查询慢 / 事务超时」的意图已经失效，且没有任何信号。
+    #
+    # 比的是**生效值**不是配置值（变更 2）：libpq 下限 2s，配 1000 实际按 2000 跑。
+    # 两条独立、都要有——只改生效值而不合链，生效值仍然不与 lock 比较。
     effective_connect_ms = s.effective_connect_timeout_s * 1000
-    if effective_connect_ms >= s.tx_timeout_ms:
+    if not (effective_connect_ms < s.lock_timeout_ms
+            < s.statement_timeout_ms < s.tx_timeout_ms):
         errors.append(
-            f"connect 生效值 {effective_connect_ms}ms"
-            f"（配置 {s.connect_timeout_ms}，libpq 下限 2s）须 < tx({s.tx_timeout_ms})"
-            f"——建连耗时计入事务预算，否则重试会全耗在建连上"
+            f"须满足 connect 生效值({effective_connect_ms}；配置 {s.connect_timeout_ms}，"
+            f"libpq 下限 2s) < lock({s.lock_timeout_ms})"
+            f" < statement({s.statement_timeout_ms}) < tx({s.tx_timeout_ms})"
         )
 
     # 不变式 4：判死窗口须显著短于对方卡死回收，否则会出现「ai 已装死但未判死、

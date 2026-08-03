@@ -23,6 +23,29 @@ from agent_hub.worker.state import worker_id_of
 
 log = logging.getLogger("agent_hub.db")
 
+# 可重试的 SQLSTATE——**按 Class 给，不按个别码列**（实现 R2 Architect Review 高①）。
+#
+# 按个别码列时，漏的永远是没想到的那个：R2 的白名单是 `40001 / 40P01 / 08*`，
+# 照设计 §4.6 的三类清单写成，**却漏掉了 `57P01`(admin_shutdown)、`57P03`
+# (cannot_connect_now) 这两个正是「PG 例行重启」的码**——而 CN-010 变更 1 从头到
+# 尾的立论就是「PG 例行重启会走到这条路径」。漏判的后果是最坏的那条：判成确定性
+# 错误 → 一次重试都没有 → `final_failed` 终态 → 且不计判死、不告警，**一条完全
+# 正常、已花掉 240s 预算和一次 LLM 调用的数据，因为撞上重启就被烧成不可恢复**。
+# **按 Class 会误收几个重试确实无用的码（57P04 database_dropped、53100 disk_full），
+# 这是有意接受的代价**：两种误判的代价严重不对称——误判为可重试只是多试几次、
+# 随后走连续失败判死（有信号、可恢复）；误判为不可重试则一次不试就进终态且不
+# 告警（无信号、不可恢复）。在这种不对称面前，宁可多重试几次。
+_RETRYABLE_SQLSTATE_CLASSES = frozenset({
+    "08",   # connection_exception —— 连接断开 / 建立失败
+    "53",   # insufficient_resources —— 含 53300 too_many_connections
+    "57",   # operator_intervention —— 含 57P01 admin_shutdown / 57P03 cannot_connect_now
+})
+_RETRYABLE_SQLSTATES = frozenset({
+    "40001",  # serialization_failure
+    "40P01",  # deadlock_detected
+    "55P03",  # lock_not_available —— lock_timeout 触发，等一会儿可能就拿到了
+})
+
 
 class DbPullSource:
     """实现 `PullSource`；映射由 `DbL1Mapper` 负责（协议按职责分层，O-2）。"""
@@ -46,10 +69,9 @@ class DbPullSource:
             return "db_error", True
         if isinstance(exc, psycopg.Error):
             state = getattr(exc, "sqlstate", None) or ""
-            # 40001 serialization_failure / 40P01 deadlock_detected / 08* 连接异常
             retryable = (
-                state in ("40001", "40P01")
-                or state.startswith("08")
+                state[:2] in _RETRYABLE_SQLSTATE_CLASSES
+                or state in _RETRYABLE_SQLSTATES
                 # 无 sqlstate 的 OperationalError：连接建立失败等环境类问题
                 or (isinstance(exc, psycopg.OperationalError) and not state)
             )

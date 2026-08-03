@@ -109,6 +109,25 @@ def test_gate_compares_effective_connect_timeout_not_configured():
         )
 
 
+# --- 测试 36：四元链门禁（CN-010 变更 8）---
+def test_connect_4500_is_rejected_by_four_element_chain():
+    """**4500 是只有四元链才拦得住的那个值**——DevOps 实测三元链下它被放行。
+
+    默认 statement=4000、tx=5000 时：生效值 4000 < tx 5000，旧的「connect < tx」
+    独立判断成立、放行；而 connect(4000) ≥ statement(4000) ≥ lock(3000)，
+    「逐层放大以便在日志里区分建连慢 / 等锁 / 查询慢 / 事务超时」已经失效。
+    用例若挑一个连三元链都拦得住的值，就与 CN-010 低③ 的无鉴别力用例同型。
+    """
+    with pytest.raises(ConfigInvariantError, match="connect"):
+        validate_worker_settings(WorkerSettings(connect_timeout_ms=4500))
+
+
+def test_four_element_chain_holds_at_defaults():
+    s = validate_worker_settings(WorkerSettings())
+    assert (s.effective_connect_timeout_s * 1000 < s.lock_timeout_ms
+            < s.statement_timeout_ms < s.tx_timeout_ms)
+
+
 # --- 测试 32：不变式 4 —— 判死窗口 < 对方卡死回收 × 0.6（CN-010 变更 3）---
 def test_loop_failure_window_within_stale_threshold():
     s = validate_worker_settings(WorkerSettings())
