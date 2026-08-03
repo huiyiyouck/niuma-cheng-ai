@@ -49,6 +49,44 @@ def _on_worker_done(state: WorkerState, task: asyncio.Task) -> None:
         state.mark_stopped()
 
 
+async def shutdown_worker(state: WorkerState, stop: asyncio.Event,
+                          task: asyncio.Task, pool, settings) -> None:
+    """优雅停机：停止新 claim → 处理完当前条目 → 释放锁 → 关池（AC-5.7）。
+
+    **从 `lifespan` 里提出来是为了让测试能验它本身**（实现 R3 Architect Review
+    中①）：原先测试自己复刻了一份停机段，验的是复刻件——删掉生产代码里的
+    `await gather` 全仓 208 条测试无一变红。**测试复刻被测对象，是本迭代第三
+    次「验证者与被验证者没有独立性」。** 纯提取，不改任何行为。
+
+    **保证**：`pool.close()` 执行时 worker task 必然已结束（`task.done()`）。
+    这才是这段代码要守的不变量——测试应当验它，而不是验某一行代码在不在。
+    """
+    state.request_stop()
+    stop.set()
+    try:
+        await asyncio.wait_for(task, timeout=settings.shutdown_grace_ms / 1000)
+    except asyncio.TimeoutError:
+        log.error("shutdown_grace_exceeded",
+                  extra={"fields": {"step": "shutdown", "status": "failed",
+                                    "grace_ms": settings.shutdown_grace_ms}})
+        # **冗余但保留**：`asyncio.wait_for` 超时时**已经**取消传入的 task 并
+        # 等它结束（`_cancel_and_wait`），实测 3.11 / 3.12 一致——TimeoutError
+        # 抛出时 `task.done()` 已为 True、收尾已跑完。故 CN-010 变更 9 要修的
+        # 「cancel 后不等就关池」在这条路径上**本就不成立**（详见实现 R3 报告）。
+        #
+        # 仍保留这两行：`wait_for` 的取消语义在 3.8 变过一次，把「关池前 task
+        # 必须已结束」这个保证显式写出来，比依赖标准库当前行为可靠；对已 done
+        # 的 task 调 `cancel()` 是 no-op，`gather` 立即返回，无代价。
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    finally:
+        # 注：`psycopg_pool.close()` 只关池内**空闲**连接（"Currently used
+        # connections will not be closed until returned to the pool"），给它加
+        # 更大的 timeout 对在用连接完全无效——按那个机理导出的修法看起来合理、
+        # 同样能「测试通过」，却根本不解决问题。
+        await pool.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """进程启动与 worker 托管（AC-1、AC-9.3 / 设计 §4.1）。"""
@@ -93,28 +131,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # 优雅停机：停止新 claim → 处理完当前条目 → 释放锁 → 退出（AC-5.7）
-    state.request_stop()
-    stop.set()
-    try:
-        await asyncio.wait_for(task, timeout=settings.shutdown_grace_ms / 1000)
-    except asyncio.TimeoutError:
-        log.error("shutdown_grace_exceeded",
-                  extra={"fields": {"step": "shutdown", "status": "failed",
-                                    "grace_ms": settings.shutdown_grace_ms}})
-        task.cancel()
-        # **必须等取消真正完成**：`cancel()` 只是「请求」取消。不等的话
-        # `lifespan` 的 finally 走完 → ASGI 生命周期结束 → **进程退出，而 worker
-        # 协程的取消尚未完成**，它持有的事务随进程一起没了，留下残留锁等对方
-        # 600s 回收——而这条路径只在宽限期耗尽时进入，恰恰是最需要收干净的时刻。
-        #
-        # 注意机理：**不是「池把使用中的连接抽走」**。`psycopg_pool.close()` 只关
-        # 池内空闲连接（"Currently used connections will not be closed until
-        # returned to the pool"），给它加更大的 timeout 完全无效——那个 timeout
-        # 等的是池的内部维护 task。唯一有效的修法就是等 task 自己结束（CN-010 变更 9）。
-        await asyncio.gather(task, return_exceptions=True)
-    finally:
-        await pool.close()
+    await shutdown_worker(state, stop, task, pool, settings)
 
 
 app = FastAPI(title="niuma-cheng-ai", version="0.2.0", lifespan=lifespan)

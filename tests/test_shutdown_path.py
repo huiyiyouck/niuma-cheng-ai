@@ -1,104 +1,177 @@
-"""测试 37：停机宽限期耗尽时须等取消真正完成再关池（CN-010 变更 9）。
+"""测试 37：优雅停机路径（CN-010 变更 9；实现 R3 Architect Review 中①）。
 
-`task.cancel()` 只是**请求**取消。不等的话，`lifespan` 的 `finally` 走完 →
-ASGI 生命周期结束 → **进程退出，而 worker 协程的取消尚未完成**，它持有的事务
-随进程一起没了，留下残留锁等对方 600s 回收。**这条路径只在宽限期耗尽时进入，
-而那恰恰是最需要收干净的时刻。**
+**本文件上一版是错的，错法值得记**：它自己复刻了一份 `lifespan` 的停机段来测，
+于是删掉 `main.py` 里的 `await gather` 后全仓 208 条测试无一变红——**验的是复刻件**。
+我当时还做了反向注入并把「2 failed」写进报告当鉴别力证据，而那个注入点打在复刻
+件上，回答的是「测试自己坏了红不红」，恒为真、零信息量。
 
-**判据用调用顺序，不用睡眠时长**（CN 明确要求）：按时长断言会在慢机器上假绿、
-在快机器上假红，而顺序是这条修复的实质——它要保证的是「关池发生在 task 真正
-结束之后」，不是「关池晚了几毫秒」。
+**更深一层是复刻件与生产代码有实质差异**：复刻件写 `wait_for(shield(task))`，
+生产代码是 `wait_for(task)`。`shield` 挡掉了 `wait_for` 自带的取消，**人为制造
+出了那个要被修的问题**——实测（3.11 与 3.12 一致）：
 
-机理注记：**不是「池把使用中的连接抽走」**。`psycopg_pool.close()` 只关池内
-空闲连接，给它加更大的 timeout 完全无效——按那个机理导出的修法看起来合理、
-同样能「测试通过」，却根本不解决问题。
+    wait_for(task)            → TimeoutError 抛出时 task.done()=True，收尾已跑完
+    wait_for(shield(task))    → task.done()=False，甚至还没收到 cancel
+
+即测试不只没验生产代码，还证明了一个**在生产代码里不成立**的命题。
+
+现在直接调用 `main.shutdown_worker`（生产代码本身），并验它真正要守的不变量：
+**`pool.close()` 执行时 worker task 必然已结束**。
 """
 from __future__ import annotations
 
 import asyncio
 
 import pytest
-from fastapi import FastAPI
 
 from agent_hub.config import WorkerSettings
+from agent_hub.main import shutdown_worker
+from agent_hub.worker.state import WorkerState
 
 
 class _RecordingPool:
-    def __init__(self, log: list[str]):
-        self._log = log
+    """记录关池时刻的 task 状态——不变量就落在这一刻。"""
+
+    def __init__(self):
+        self.closed = False
+        self.task_done_at_close: bool | None = None
+        self._task: asyncio.Task | None = None
+
+    def watch(self, task: asyncio.Task) -> None:
+        self._task = task
 
     async def close(self):
-        self._log.append("pool_closed")
+        self.closed = True
+        self.task_done_at_close = self._task.done() if self._task else None
 
 
-async def _run_shutdown(worker_body, log: list[str], grace_ms: int = 20):
-    """复刻 `lifespan` 的停机段：等 task → 超时则 cancel → 等取消完成 → 关池。
+async def _shutdown(worker_body, grace_ms: int = 20):
+    state = WorkerState(lock_token="w#1")
+    stop = asyncio.Event()
+    task = asyncio.create_task(worker_body(stop))
+    pool = _RecordingPool()
+    pool.watch(task)
+    settings = WorkerSettings(run_mode="db", shutdown_grace_ms=grace_ms)
+    await shutdown_worker(state, stop, task, pool, settings)
+    return state, task, pool
 
-    直接跑 `lifespan` 需要真实 DB 与 LLM，故此处复刻停机段本身。**被验的是
-    「cancel 之后有没有等」这一个决策**，它完整落在这几行里。
+
+# --- 核心不变量 ---
+async def test_pool_never_closes_before_worker_finished_on_timeout():
+    """宽限期耗尽路径：worker 在取消点之后还有收尾要跑（释放锁 / 回滚事务）。
+
+    **断言关池那一刻 task 已结束**——而不是断言某一行代码在不在。上一版验的是
+    「有没有 `await gather`」，那是实现细节；**这里验的是保证本身**。
     """
-    task = asyncio.create_task(worker_body())
-    pool = _RecordingPool(log)
-    try:
-        await asyncio.wait_for(asyncio.shield(task), timeout=grace_ms / 1000)
-    except asyncio.TimeoutError:
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-    finally:
-        await pool.close()
-    return task
+    trace: list[str] = []
+
+    async def worker(stop):
+        try:
+            await asyncio.sleep(10)          # 宽限期内跑不完
+        except asyncio.CancelledError:
+            trace.append("cancel_received")
+            await asyncio.sleep(0.02)        # 取消点之后仍有 await
+            trace.append("cleanup_done")
+            raise
+
+    _, task, pool = await _shutdown(worker)
+
+    assert pool.closed
+    assert pool.task_done_at_close is True, "关池时 worker 尚未结束——事务会随进程消失"
+    assert trace == ["cancel_received", "cleanup_done"], trace
 
 
-async def test_pool_closes_only_after_cancellation_completes():
-    """worker 在收到 `CancelledError` 之后仍有一段收尾要跑（释放锁 / 回滚）。
+async def test_pool_never_closes_before_worker_finished_on_normal_exit():
+    """宽限期内正常收尾：同一条不变量，不同路径。"""
+    trace: list[str] = []
 
-    断言 `pool_closed` 排在 `worker_cleanup_done` **之后**——若 `cancel()` 后
-    不等，顺序会反过来，收尾在进程消失前根本没跑完。
+    async def worker(stop):
+        await stop.wait()
+        trace.append("worker_returned")
+
+    _, task, pool = await _shutdown(worker, grace_ms=2000)
+
+    assert pool.task_done_at_close is True
+    assert trace == ["worker_returned"]
+    assert not task.cancelled()              # 正常收尾不该走取消路径
+
+
+async def test_stop_signal_is_set_before_waiting():
+    """先置停机信号再等——否则 worker 永远等不到、必然走满宽限期。"""
+
+    async def worker(stop):
+        assert stop.is_set(), "shutdown_worker 应先 stop.set() 再等待"
+
+    state, _, pool = await _shutdown(worker, grace_ms=2000)
+    assert state.phase == "stopping"
+    assert pool.closed
+
+
+async def test_worker_exception_propagates_but_pool_still_closes():
+    """worker 以异常结束时：**池仍然关闭（`finally` 生效），但异常会向上抛**。
+
+    这是实测出来的当前真实行为，不是我预期的——我原本以为 `shutdown_worker`
+    会静默收尾。`wait_for` 在 task 以异常结束时抛的是**该异常本身**而非
+    `TimeoutError`，于是它穿过 `except asyncio.TimeoutError` 直达调用方。
+
+    **不变量仍然成立**（关池时 task 已结束），故不构成缺陷。但有一个观察已报出、
+    未擅自改（Architect 附条件明确「纯提取，不改任何生产行为」）：worker 异常
+    死亡时 `_on_worker_done` 已经记录过一次，停机路径再抛一次会让 uvicorn 的
+    shutdown 日志出现一个看起来像新故障的异常——而它其实是几分钟前那次判死的
+    回声。灰度期看日志的人会被引向错误的时间点。
     """
-    log: list[str] = []
+    state = WorkerState(lock_token="w#1")
+    stop = asyncio.Event()
+
+    async def worker():
+        raise RuntimeError("boom")
+
+    task = asyncio.create_task(worker())
+    pool = _RecordingPool()
+    pool.watch(task)
+    settings = WorkerSettings(run_mode="db", shutdown_grace_ms=2000)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await shutdown_worker(state, stop, task, pool, settings)
+
+    assert pool.closed, "异常路径下 finally 未生效，池会泄漏"
+    assert pool.task_done_at_close is True
+
+
+# --- 反向注入的有效形式 ---
+async def test_invariant_would_break_if_wait_were_shielded():
+    """**这条是上一版缺的那个东西**：证明本组测试确实抓得住保证被破坏的情况。
+
+    按 Architect 给的判据「删掉 `await gather` 后测试必须变红」在生产代码上
+    做不到——实测 `wait_for(task)` 超时时已经取消并等待完成，那两行是冗余的。
+    **有效的注入不是删一行冗余代码，是破坏保证本身**：给 `wait_for` 包一层
+    `shield`（正是上一版复刻件的写法），worker 就会在关池后才结束。
+
+    此处直接复现被破坏的形态并断言它确实被破坏——若哪天 `wait_for` 的语义变了
+    使这条不再成立，本条会红，提醒重新审视 `shutdown_worker` 的兜底是否仍够。
+    """
+    trace: list[str] = []
 
     async def worker():
         try:
-            await asyncio.sleep(10)          # 宽限期内跑不完，必然被 cancel
+            await asyncio.sleep(10)
         except asyncio.CancelledError:
-            log.append("cancel_received")
-            # 取消点之后仍有 await：释放锁、回滚事务都是要连 DB 的
             await asyncio.sleep(0.02)
-            log.append("worker_cleanup_done")
+            trace.append("cleanup_done")
             raise
 
-    await _run_shutdown(worker, log)
+    task = asyncio.create_task(worker())
+    try:
+        await asyncio.wait_for(asyncio.shield(task), timeout=0.02)
+    except asyncio.TimeoutError:
+        pass
 
-    assert log == ["cancel_received", "worker_cleanup_done", "pool_closed"], log
-
-
-async def test_shutdown_does_not_hang_when_worker_finishes_in_time():
-    """宽限期内正常收尾时不进入取消路径，关池照常。"""
-    log: list[str] = []
-
-    async def worker():
-        log.append("worker_done")
-
-    await _run_shutdown(worker, log, grace_ms=500)
-    assert log == ["worker_done", "pool_closed"]
-
-
-async def test_cancelled_worker_exception_is_not_swallowed_into_failure():
-    """`gather(..., return_exceptions=True)` 吞掉 `CancelledError` 是有意的：
-    这是我们自己发起的取消，不是故障，不该让停机流程再抛一次。"""
-    log: list[str] = []
-
-    async def worker():
-        await asyncio.sleep(10)
-
-    task = await _run_shutdown(worker, log)
-    assert task.cancelled()
-    assert log == ["pool_closed"]
+    assert task.done() is False, "shield 下 task 本应仍在跑——若此断言红了说明 wait_for 语义已变"
+    assert trace == []
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
 
 
 @pytest.mark.parametrize("run_mode", ["http"])
-def test_http_mode_has_no_pool_to_close(run_mode):
+def test_http_mode_never_reaches_shutdown_worker(run_mode):
     """HTTP 模式不建池、不起 worker，停机段整个不进入（AC-1.4）。"""
-    app = FastAPI()
-    app.state.settings = WorkerSettings(run_mode=run_mode)
-    assert app.state.settings.run_mode != "db"
+    assert WorkerSettings(run_mode=run_mode).run_mode != "db"
